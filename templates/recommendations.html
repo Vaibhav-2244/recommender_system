@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Recommendations{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <h2 class="text-center">Recommended Users</h2>
+        {% if users %}
+            <ul class="list-group">
+                {% for user in users %}
+                    <li class="list-group-item">
+                        <strong>{{ user.username }}</strong> ({{ user.email }})<br>
+                        <small>{{ user.bio }}</small>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-center text-muted">No similar users found.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
