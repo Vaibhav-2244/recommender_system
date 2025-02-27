@@ -7,5 +7,5 @@ def get_db():
         user="root",
         password="root123",
         database="recommendation_db",
-        cursorclass=DictCursor  # ✅ Corrected Cursor Class
+        cursorclass=DictCursor  
     )

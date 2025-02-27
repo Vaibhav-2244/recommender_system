@@ -5,7 +5,7 @@ import MySQLdb
 
 auth = Blueprint("auth", __name__)
 
-# Signup Route
+
 @auth.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
@@ -33,7 +33,7 @@ def signup():
     return render_template("signup.html")
 
 
-# Login Route
+
 @auth.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -58,7 +58,7 @@ def login():
     return render_template("login.html")
 
 
-# Logout Route
+
 @auth.route("/logout")
 def logout():
     session.clear()
