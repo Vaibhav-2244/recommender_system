@@ -1,21 +1,38 @@
 {% extends "base.html" %}
-{% block title %}Profile{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <h2 class="text-center">Profile</h2>
-        <form action="{{ url_for('profile') }}" method="POST">
-            <div class="mb-3">
-                <label class="form-label">Bio</label>
-                <textarea name="bio" class="form-control">{{ profile.bio }}</textarea>
+    <div class="container">
+        <!-- Show different headings based on the profile type -->
+        {% if is_own_profile %}
+            <h2 class="text-center">My Profile</h2>
+        {% else %}
+            <h2 class="text-center">{{ profile.username }}'s Profile</h2>
+        {% endif %}
+
+        <div class="card">
+            <div class="card-body">
+                <!-- Show the update form only if it's the logged-in user's profile -->
+                {% if is_own_profile %}
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="bio" class="form-label">Bio</label>
+                            <textarea class="form-control" id="bio" name="bio" rows="3">{{ profile.bio }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="interests" class="form-label">Interests</label>
+                            <textarea class="form-control" id="interests" name="interests" rows="3">{{ profile.interests }}</textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Update Profile</button>
+                    </form>
+                {% else %}
+                    <!-- Show profile details only for other users -->
+                    <h5 class="card-title">Bio</h5>
+                    <p class="card-text">{{ profile.bio }}</p>
+
+                    <h5 class="card-title">Interests</h5>
+                    <p class="card-text">{{ profile.interests }}</p>
+                {% endif %}
             </div>
-            <div class="mb-3">
-                <label class="form-label">Interests</label>
-                <input type="text" name="interests" class="form-control" value="{{ profile.interests }}">
-            </div>
-            <button type="submit" class="btn btn-info w-100">Update</button>
-        </form>
+        </div>
     </div>
-</div>
 {% endblock %}

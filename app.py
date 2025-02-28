@@ -11,7 +11,7 @@ def home():
     return redirect(url_for("auth.login"))  
 
 
-# Profile Page
+# Own Profile Page
 @app.route("/profile", methods=["GET", "POST"])
 def profile():
     if "user_id" not in session:
@@ -22,30 +22,26 @@ def profile():
     db = get_db()
     cur = db.cursor()
 
-
-    cur.execute("SELECT * FROM profiles WHERE user_id = %s", (user_id,))
+    # Fetch the logged-in user's profile
+    cur.execute("SELECT users.username, profiles.bio, profiles.interests FROM users JOIN profiles ON users.id = profiles.user_id WHERE users.id = %s", (user_id,))
     profile = cur.fetchone()
-
-    if not profile:
-        cur.execute("INSERT INTO profiles (user_id, bio, interests) VALUES (%s, '', '')", (user_id,))
-        db.commit()
 
     if request.method == "POST":
         bio = request.form["bio"]
         interests = request.form["interests"]
 
-        cur.execute("UPDATE profiles SET bio = %s, interests = %s WHERE user_id = %s",
-                    (bio, interests, user_id))
+        cur.execute("UPDATE profiles SET bio = %s, interests = %s WHERE user_id = %s", (bio, interests, user_id))
         db.commit()
         flash("Profile updated successfully!", "success")
 
-  
-        cur.execute("SELECT * FROM profiles WHERE user_id = %s", (user_id,))
+        # Fetch updated profile
+        cur.execute("SELECT users.username, profiles.bio, profiles.interests FROM users JOIN profiles ON users.id = profiles.user_id WHERE users.id = %s", (user_id,))
         profile = cur.fetchone()
 
     cur.close()
     db.close()
-    return render_template("profile.html", profile=profile)
+
+    return render_template("profile.html", profile=profile, is_own_profile=True)
 
 
 
@@ -87,8 +83,28 @@ def recommendations():
 
     return render_template("recommendations.html", users=recommendations)
 
+# View Other Users' Profiles
+@app.route("/profile/<int:user_id>")
+def view_profile(user_id):
+    if "user_id" not in session:
+        flash("Please log in first.", "warning")
+        return redirect(url_for("auth.login"))
 
+    db = get_db()
+    cur = db.cursor()
 
+    # Fetch the requested user's profile
+    cur.execute("SELECT users.username, profiles.bio, profiles.interests FROM users JOIN profiles ON users.id = profiles.user_id WHERE users.id = %s", (user_id,))
+    profile = cur.fetchone()
+
+    cur.close()
+    db.close()
+
+    if not profile:
+        flash("Profile not found.", "danger")
+        return redirect(url_for("recommendations"))
+
+    return render_template("profile.html", profile=profile, is_own_profile=False)
 
 if __name__ == "__main__":
     app.run(debug=True)
