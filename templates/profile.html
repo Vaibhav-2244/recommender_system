@@ -1,38 +1,103 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <div class="container">
-        <!-- Show different headings based on the profile type -->
-        {% if is_own_profile %}
-            <h2 class="text-center">My Profile</h2>
-        {% else %}
-            <h2 class="text-center">{{ profile.username }}'s Profile</h2>
-        {% endif %}
+<div class="container mt-4">
+    {% if is_own_profile %}
+        <h2 class="text-center">My Profile</h2>
+    {% else %}
+        <h2 class="text-center">{{ profile.username }}'s Profile</h2>
+    {% endif %}
 
-        <div class="card">
-            <div class="card-body">
-                <!-- Show the update form only if it's the logged-in user's profile -->
-                {% if is_own_profile %}
-                    <form method="POST">
-                        <div class="mb-3">
-                            <label for="bio" class="form-label">Bio</label>
-                            <textarea class="form-control" id="bio" name="bio" rows="3">{{ profile.bio }}</textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label for="interests" class="form-label">Interests</label>
-                            <textarea class="form-control" id="interests" name="interests" rows="3">{{ profile.interests }}</textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Update Profile</button>
+    <div class="card">
+        <div class="card-body">
+            {% if is_own_profile %}
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="bio" class="form-label">Bio</label>
+                        <textarea class="form-control" id="bio" name="bio" rows="3">{{ profile.bio }}</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="interests" class="form-label">Interests</label>
+                        <textarea class="form-control" id="interests" name="interests" rows="3">{{ profile.interests }}</textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Update Profile</button>
+                </form>
+
+                <!-- Section to Accept/Reject Connection Requests -->
+                <div class="mt-4">
+                    <h5>Pending Connection Requests</h5>
+                    <div style="max-height: 200px; overflow-y: auto;">
+                        {% for request in friend_requests %}
+                            <div class="d-flex justify-content-between align-items-center border p-2 mb-2">
+                                <span>{{ request.username }}</span>
+                                <div>
+                                    <a href="{{ url_for('respond_request', request_id=request.id, action='accept') }}" class="btn btn-success btn-sm">Accept</a>
+                                    <a href="{{ url_for('respond_request', request_id=request.id, action='decline') }}" class="btn btn-danger btn-sm">Decline</a>
+                                </div>
+                            </div>
+                        {% else %}
+                            <p class="text-muted">No pending requests.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Connections Section -->
+                <div class="mt-4">
+                    <h5>
+                        <span id="toggle-connections" style="cursor: pointer; color: blue;">
+                            {{ connections|length }} Connections
+                        </span>
+                    </h5>
+                    <div id="connections-list" class="mt-2" style="display: none;">
+                        {% for connection in connections %}
+                            <div class="d-flex justify-content-between align-items-center border p-2 mb-2">
+                                <span>{{ connection.username }}</span>
+                                <a href="{{ url_for('view_profile', user_id=connection.id) }}" class="btn btn-primary btn-sm">View Profile</a>
+                            </div>
+                        {% else %}
+                            <p class="text-muted">No connections yet.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% else %}
+                <h5 class="card-title">Bio</h5>
+                <p class="card-text">{{ profile.bio }}</p>
+
+                <h5 class="card-title">Interests</h5>
+                <p class="card-text">{{ profile.interests }}</p>
+
+                <!-- Connect Button (with pending and disconnect state) -->
+                {% if connection_status == 'pending' %}
+                    <button class="btn btn-secondary" disabled>Pending</button>
+                {% elif connection_status == 'accepted' %}
+                    <form method="POST" action="{{ url_for('disconnect', user_id=profile.id) }}">
+                        <button type="submit" class="btn btn-danger">Disconnect</button>
                     </form>
                 {% else %}
-                    <!-- Show profile details only for other users -->
-                    <h5 class="card-title">Bio</h5>
-                    <p class="card-text">{{ profile.bio }}</p>
-
-                    <h5 class="card-title">Interests</h5>
-                    <p class="card-text">{{ profile.interests }}</p>
+                    <form method="POST" action="{{ url_for('send_request', receiver_id=profile.id) }}">
+                        <button type="submit" class="btn btn-primary">Connect</button>
+                    </form>
                 {% endif %}
-            </div>
+
+
+                <!-- Messaging option always available -->
+                <form action="{{ url_for('start_chat', receiver_id=profile.id) }}" method="POST">
+                    <button type="submit" class="btn btn-primary mt-3">Send Message</button>
+                </form>
+            {% endif %}
         </div>
     </div>
+</div>
+
+<script>
+    document.getElementById("toggle-connections").addEventListener("click", function() {
+        var connectionsList = document.getElementById("connections-list");
+        if (connectionsList.style.display === "none") {
+            connectionsList.style.display = "block";
+        } else {
+            connectionsList.style.display = "none";
+        }
+    });
+</script>
+
 {% endblock %}

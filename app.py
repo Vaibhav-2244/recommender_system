@@ -22,26 +22,48 @@ def profile():
     db = get_db()
     cur = db.cursor()
 
-    # Fetch the logged-in user's profile
-    cur.execute("SELECT users.username, profiles.bio, profiles.interests FROM users JOIN profiles ON users.id = profiles.user_id WHERE users.id = %s", (user_id,))
+    # Fetch user profile details
+    cur.execute("SELECT username, bio, interests FROM users JOIN profiles ON users.id = profiles.user_id WHERE users.id = %s", (user_id,))
     profile = cur.fetchone()
 
+    # Fetch pending connection requests
+    cur.execute("""
+        SELECT connections.id, users.username 
+        FROM connections 
+        JOIN users ON users.id = connections.sender_id 
+        WHERE connections.receiver_id = %s AND connections.status = 'pending'
+    """, (user_id,))
+    friend_requests = cur.fetchall()
+
+    # Fetch connected users
+    cur.execute("""
+        SELECT users.id, users.username 
+        FROM connections 
+        JOIN users ON users.id = CASE 
+            WHEN connections.sender_id = %s THEN connections.receiver_id
+            ELSE connections.sender_id 
+        END
+        WHERE (connections.sender_id = %s OR connections.receiver_id = %s) AND connections.status = 'accepted'
+    """, (user_id, user_id, user_id))
+    connections = cur.fetchall()
+
+    # Handle profile update
     if request.method == "POST":
         bio = request.form["bio"]
         interests = request.form["interests"]
 
-        cur.execute("UPDATE profiles SET bio = %s, interests = %s WHERE user_id = %s", (bio, interests, user_id))
+        cur.execute("UPDATE profiles SET bio = %s, interests = %s WHERE user_id = %s",
+                    (bio, interests, user_id))
         db.commit()
         flash("Profile updated successfully!", "success")
-
-        # Fetch updated profile
-        cur.execute("SELECT users.username, profiles.bio, profiles.interests FROM users JOIN profiles ON users.id = profiles.user_id WHERE users.id = %s", (user_id,))
-        profile = cur.fetchone()
+        return redirect(url_for("profile"))
 
     cur.close()
     db.close()
 
-    return render_template("profile.html", profile=profile, is_own_profile=True)
+    return render_template("profile.html", profile=profile, friend_requests=friend_requests, connections=connections, is_own_profile=True)
+
+
 
 
 
@@ -90,21 +112,153 @@ def view_profile(user_id):
         flash("Please log in first.", "warning")
         return redirect(url_for("auth.login"))
 
+    current_user_id = session["user_id"]
     db = get_db()
     cur = db.cursor()
 
     # Fetch the requested user's profile
-    cur.execute("SELECT users.username, profiles.bio, profiles.interests FROM users JOIN profiles ON users.id = profiles.user_id WHERE users.id = %s", (user_id,))
+    cur.execute("SELECT users.id, users.username, profiles.bio, profiles.interests FROM users JOIN profiles ON users.id = profiles.user_id WHERE users.id = %s", (user_id,))
     profile = cur.fetchone()
-
-    cur.close()
-    db.close()
 
     if not profile:
         flash("Profile not found.", "danger")
         return redirect(url_for("recommendations"))
 
-    return render_template("profile.html", profile=profile, is_own_profile=False)
+    # Check connection status
+    cur.execute("SELECT status FROM connections WHERE (sender_id = %s AND receiver_id = %s) OR (sender_id = %s AND receiver_id = %s)", (current_user_id, user_id, user_id, current_user_id))
+    connection = cur.fetchone()
+    
+    connection_status = None
+    if connection:
+        connection_status = connection["status"]
+
+    cur.close()
+    db.close()
+
+    return render_template("profile.html", profile=profile, is_own_profile=False, connection_status=connection_status)
+
+
+# send request 
+
+@app.route("/send_request/<int:receiver_id>", methods=["POST"])
+def send_request(receiver_id):
+    if "user_id" not in session:
+        flash("Please log in first.", "warning")
+        return redirect(url_for("auth.login"))
+
+    sender_id = session["user_id"]
+    if sender_id == receiver_id:
+        flash("You cannot connect with yourself.", "danger")
+        return redirect(url_for("view_profile", user_id=receiver_id))
+
+    db = get_db()
+    cur = db.cursor()
+
+    # Check if a connection already exists
+    cur.execute("""
+        SELECT status FROM connections 
+        WHERE (sender_id = %s AND receiver_id = %s) 
+        OR (sender_id = %s AND receiver_id = %s)
+    """, (sender_id, receiver_id, receiver_id, sender_id))
+    existing_request = cur.fetchone()
+
+    if existing_request:
+        flash("You already have a pending or accepted connection with this user!", "info")
+    else:
+        cur.execute("""
+            INSERT INTO connections (sender_id, receiver_id, status) 
+            VALUES (%s, %s, 'pending')
+        """, (sender_id, receiver_id))
+        db.commit()
+        flash("Connection request sent!", "success")
+
+    cur.close()
+    db.close()
+    return redirect(url_for("view_profile", user_id=receiver_id))
+
+
+# accept or decline request
+
+@app.route("/respond_request/<int:request_id>/<string:action>")
+def respond_request(request_id, action):
+    if "user_id" not in session:
+        flash("Please log in first.", "warning")
+        return redirect(url_for("auth.login"))
+
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        if action == "accept":
+            cur.execute("UPDATE connections SET status = 'accepted' WHERE id = %s", (request_id,))
+            flash("Connection accepted!", "success")
+        elif action == "decline":
+            cur.execute("DELETE FROM connections WHERE id = %s", (request_id,))
+            flash("Connection declined!", "info")
+
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        flash(f"Error: {str(e)}", "danger")
+    finally:
+        cur.close()
+        db.close()
+
+    return redirect(url_for("profile"))
+
+# disconnect
+
+@app.route("/disconnect/<int:user_id>", methods=["POST"])
+def disconnect(user_id):
+    if "user_id" not in session:
+        flash("Please log in first.", "warning")
+        return redirect(url_for("auth.login"))
+
+    current_user_id = session["user_id"]
+
+    db = get_db()
+    cur = db.cursor()
+
+    # Delete the connection from either direction
+    cur.execute("""
+        DELETE FROM connections 
+        WHERE (sender_id = %s AND receiver_id = %s) 
+        OR (sender_id = %s AND receiver_id = %s)
+    """, (current_user_id, user_id, user_id, current_user_id))
+    
+    db.commit()
+    cur.close()
+    db.close()
+
+    flash("You are no longer connected.", "info")
+    return redirect(url_for("view_profile", user_id=user_id))
+
+
+# send messages 
+
+@app.route("/chat/<int:receiver_id>", methods=["POST"])
+def start_chat(receiver_id):
+    if "user_id" not in session:
+        flash("Please log in first.", "warning")
+        return redirect(url_for("auth.login"))
+
+    sender_id = session["user_id"]
+    message_content = request.form["message"]
+
+    if not message_content.strip():
+        flash("Message cannot be empty!", "danger")
+        return redirect(url_for("view_profile", user_id=receiver_id))
+
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("INSERT INTO messages (sender_id, receiver_id, content) VALUES (%s, %s, %s)", (sender_id, receiver_id, message_content))
+    db.commit()
+
+    cur.close()
+    db.close()
+    flash("Message sent successfully!", "success")
+    return redirect(url_for("view_profile", user_id=receiver_id))
+
 
 if __name__ == "__main__":
     app.run(debug=True)
