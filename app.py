@@ -26,6 +26,10 @@ def profile():
     cur.execute("SELECT username, bio, interests FROM users JOIN profiles ON users.id = profiles.user_id WHERE users.id = %s", (user_id,))
     profile = cur.fetchone()
 
+    if not profile:
+        cur.execute("INSERT INTO profiles (user_id, bio, interests) VALUES (%s, '', '')", (user_id,))
+        db.commit()
+
     # Fetch pending connection requests
     cur.execute("""
         SELECT connections.id, users.username 
@@ -62,9 +66,6 @@ def profile():
     db.close()
 
     return render_template("profile.html", profile=profile, friend_requests=friend_requests, connections=connections, is_own_profile=True)
-
-
-
 
 
 # Recommendations
