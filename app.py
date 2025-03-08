@@ -1,10 +1,20 @@
-from flask import Flask, render_template, session, redirect, url_for, request, flash
+from flask import Flask, render_template, session, redirect, url_for, request, flash, Blueprint
 from auth import auth
 from database import get_db
+from flask_socketio import SocketIO, emit,join_room, leave_room
+from routes.messages import messages_bp, socketio
+
 
 app = Flask(__name__)
 app.secret_key = "8349fh79d98d39je"  
-app.register_blueprint(auth, url_prefix="/auth")
+
+# Initialize WebSockets with Flask app
+socketio.init_app(app)
+
+# Register blueprints
+app.register_blueprint(auth)  # Ensure this is defined in auth.py
+app.register_blueprint(messages_bp)
+
 
 @app.route("/")
 def home():
@@ -235,31 +245,5 @@ def disconnect(user_id):
     return redirect(url_for("view_profile", user_id=user_id))
 
 
-# send messages 
-
-@app.route("/chat/<int:receiver_id>", methods=["POST"])
-def start_chat(receiver_id):
-    if "user_id" not in session:
-        flash("Please log in first.", "warning")
-        return redirect(url_for("auth.login"))
-
-    sender_id = session["user_id"]
-    message_content = request.form["message"]
-
-    if not message_content.strip():
-        flash("Message cannot be empty!", "danger")
-        return redirect(url_for("view_profile", user_id=receiver_id))
-
-    db = get_db()
-    cur = db.cursor()
-    cur.execute("INSERT INTO messages (sender_id, receiver_id, content) VALUES (%s, %s, %s)", (sender_id, receiver_id, message_content))
-    db.commit()
-
-    cur.close()
-    db.close()
-    flash("Message sent successfully!", "success")
-    return redirect(url_for("view_profile", user_id=receiver_id))
-
-
 if __name__ == "__main__":
-    app.run(debug=True)
+    socketio.run(app, debug=True)

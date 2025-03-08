@@ -81,7 +81,7 @@
 
 
                 <!-- Messaging option always available -->
-                <form action="{{ url_for('start_chat', receiver_id=profile.id) }}" method="POST">
+                <form action="{{ url_for('messages.chat', receiver_id=profile.id) }}" method="GET">
                     <button type="submit" class="btn btn-primary mt-3">Send Message</button>
                 </form>
             {% endif %}
