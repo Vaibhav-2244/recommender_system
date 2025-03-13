@@ -16,7 +16,12 @@ def chat(receiver_id):
     cursor = db.cursor()
 
     # Fetch receiver details
-    cursor.execute("SELECT id, username FROM users WHERE id=%s", (receiver_id,))
+    cursor.execute("""
+        SELECT u.id, u.username, p.profile_pic 
+        FROM users u
+        JOIN profiles p ON u.id = p.user_id
+        WHERE u.id = %s
+    """, (receiver_id,))
     receiver = cursor.fetchone()
 
     # Fetch chat history
@@ -81,8 +86,9 @@ def inbox():
 
     # Fetch unique users who had a conversation
     cursor.execute("""
-        SELECT DISTINCT u.id, u.username 
+        SELECT DISTINCT u.id, u.username, p.profile_pic
         FROM users u
+        JOIN profiles p ON u.id = p.user_id
         JOIN messages m ON (u.id = m.sender_id OR u.id = m.receiver_id)
         WHERE (m.sender_id = %s OR m.receiver_id = %s) AND u.id != %s
     """, (user_id, user_id, user_id))

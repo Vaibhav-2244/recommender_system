@@ -11,16 +11,35 @@
     <div class="card">
         <div class="card-body">
             {% if is_own_profile %}
-                <form method="POST">
-                    <div class="mb-3">
-                        <label for="bio" class="form-label">Bio</label>
-                        <textarea class="form-control" id="bio" name="bio" rows="3">{{ profile.bio }}</textarea>
+                <!-- Combined Form for Profile Picture, Bio, and Interests -->
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="row">
+                        <!-- Profile Picture Section (Left Side) -->
+                        <div class="col-md-3 text-center">
+                            <label for="profile_pic_upload" style="cursor: pointer;">
+                                {% if profile.profile_pic %}
+                                    <img id="profile_pic_preview" src="{{ url_for('static', filename=profile.profile_pic) }}" alt="Profile Picture" class="img-fluid rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
+                                {% else %}
+                                    <img src="{{ url_for('static', filename='default_profile_pic.png') }}" alt="Default Profile Picture" class="img-fluid rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
+                                {% endif %}
+                            </label>
+                            <!-- Hidden File Input for Profile Picture -->
+                            <input type="file" id="profile_pic_upload" name="profile_pic" style="display: none;">
+                        </div>
+
+                        <!-- Bio and Interests Section (Right Side) -->
+                        <div class="col-md-9">
+                            <div class="mb-3">
+                                <label for="bio" class="form-label">Bio</label>
+                                <textarea class="form-control" id="bio" name="bio" rows="3">{{ profile.bio }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="interests" class="form-label">Interests</label>
+                                <textarea class="form-control" id="interests" name="interests" rows="3">{{ profile.interests }}</textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Update Profile</button>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="interests" class="form-label">Interests</label>
-                        <textarea class="form-control" id="interests" name="interests" rows="3">{{ profile.interests }}</textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Update Profile</button>
                 </form>
 
                 <!-- Section to Accept/Reject Connection Requests -->
@@ -60,30 +79,43 @@
                     </div>
                 </div>
             {% else %}
-                <h5 class="card-title">Bio</h5>
-                <p class="card-text">{{ profile.bio }}</p>
+                <div class="row">
+                    <!-- Profile Picture Section (Left Side) -->
+                    <div class="col-md-3 text-center">
+                        {% if profile.profile_pic %}
+                            <img src="{{ url_for('static', filename=profile.profile_pic) }}" alt="Profile Picture" class="img-fluid rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
+                        {% else %}
+                            <img src="{{ url_for('static', filename='default_profile_pic.png') }}" alt="Default Profile Picture" class="img-fluid rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
+                        {% endif %}
+                    </div>
 
-                <h5 class="card-title">Interests</h5>
-                <p class="card-text">{{ profile.interests }}</p>
+                    <!-- Bio and Interests Section (Right Side) -->
+                    <div class="col-md-9">
+                        <h5 class="card-title">Bio</h5>
+                        <p class="card-text">{{ profile.bio }}</p>
 
-                <!-- Connect Button (with pending and disconnect state) -->
-                {% if connection_status == 'pending' %}
-                    <button class="btn btn-secondary" disabled>Pending</button>
-                {% elif connection_status == 'accepted' %}
-                    <form method="POST" action="{{ url_for('disconnect', user_id=profile.id) }}">
-                        <button type="submit" class="btn btn-danger">Disconnect</button>
-                    </form>
-                {% else %}
-                    <form method="POST" action="{{ url_for('send_request', receiver_id=profile.id) }}">
-                        <button type="submit" class="btn btn-primary">Connect</button>
-                    </form>
-                {% endif %}
+                        <h5 class="card-title">Interests</h5>
+                        <p class="card-text">{{ profile.interests }}</p>
 
+                        <!-- Connect Button (with pending and disconnect state) -->
+                        {% if connection_status == 'pending' %}
+                            <button class="btn btn-secondary" disabled>Pending</button>
+                        {% elif connection_status == 'accepted' %}
+                            <form method="POST" action="{{ url_for('disconnect', user_id=profile.id) }}">
+                                <button type="submit" class="btn btn-danger">Disconnect</button>
+                            </form>
+                        {% else %}
+                            <form method="POST" action="{{ url_for('send_request', receiver_id=profile.id) }}">
+                                <button type="submit" class="btn btn-primary">Connect</button>
+                            </form>
+                        {% endif %}
 
-                <!-- Messaging option always available -->
-                <form action="{{ url_for('messages.chat', receiver_id=profile.id) }}" method="GET">
-                    <button type="submit" class="btn btn-primary mt-3">Send Message</button>
-                </form>
+                        <!-- Messaging option always available -->
+                        <form action="{{ url_for('messages.chat', receiver_id=profile.id) }}" method="GET">
+                            <button type="submit" class="btn btn-primary mt-3">Send Message</button>
+                        </form>
+                    </div>
+                </div>
             {% endif %}
         </div>
     </div>
@@ -98,6 +130,22 @@
             connectionsList.style.display = "none";
         }
     });
-</script>
 
+        // Preview selected profile picture
+        document.getElementById("profile_pic_upload").addEventListener("change", function(event) {
+            const file = event.target.files[0]; // Get the selected file
+            if (file) {
+                const reader = new FileReader(); // Create a FileReader to read the file
+    
+                // Set up the FileReader onload event
+                reader.onload = function(e) {
+                    // Update the src attribute of the profile picture preview
+                    document.getElementById("profile_pic_preview").src = e.target.result;
+                };
+    
+                // Read the file as a Data URL (base64 encoded)
+                reader.readAsDataURL(file);
+            }
+        });
+</script>
 {% endblock %}

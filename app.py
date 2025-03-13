@@ -1,12 +1,13 @@
 from flask import Flask, render_template, session, redirect, url_for, request, flash, Blueprint
 from auth import auth
 from database import get_db
-from flask_socketio import SocketIO, emit,join_room, leave_room
+from flask_socketio import SocketIO, emit, join_room, leave_room
 from routes.messages import messages_bp, socketio
-
+import os
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = "8349fh79d98d39je"  
+app.secret_key = "8349fh79d98d39je"
 
 # Initialize WebSockets with Flask app
 socketio.init_app(app)
@@ -14,6 +15,17 @@ socketio.init_app(app)
 # Register blueprints
 app.register_blueprint(auth)  # Ensure this is defined in auth.py
 app.register_blueprint(messages_bp)
+
+# Configure upload folder and allowed extensions
+app.config['UPLOAD_FOLDER'] = 'static/uploads'  # Folder to store uploaded images
+app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}  # Allowed file extensions
+
+# Ensure the upload folder exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Helper function to check allowed file extensions
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 
 @app.route("/")
@@ -32,15 +44,39 @@ def profile():
     db = get_db()
     cur = db.cursor()
 
-    # Fetch user profile details
-    cur.execute("SELECT username, bio, interests FROM users JOIN profiles ON users.id = profiles.user_id WHERE users.id = %s", (user_id,))
+    # Fetch user profile details, including profile_pic
+    cur.execute("SELECT username, bio, interests, profile_pic FROM users JOIN profiles ON users.id = profiles.user_id WHERE users.id = %s", (user_id,))
     profile = cur.fetchone()
 
     if not profile:
-        cur.execute("INSERT INTO profiles (user_id, bio, interests) VALUES (%s, '', '')", (user_id,))
+        cur.execute("INSERT INTO profiles (user_id, bio, interests, profile_pic) VALUES (%s, '', '', NULL)", (user_id,))
         db.commit()
 
-    # Fetch pending connection requests
+    # Handle profile update (including profile picture upload)
+    if request.method == "POST":
+        bio = request.form.get("bio", "")
+        interests = request.form.get("interests", "")
+
+        # Handle profile picture upload
+        if 'profile_pic' in request.files:
+            file = request.files['profile_pic']
+            if file.filename != '' and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(filepath)
+
+                # Store only the relative path in the database
+                relative_path = os.path.join('uploads', filename).replace("\\", "/")
+                cur.execute("UPDATE profiles SET profile_pic = %s WHERE user_id = %s", (relative_path, user_id))
+                db.commit()
+
+        # Update bio and interests
+        cur.execute("UPDATE profiles SET bio = %s, interests = %s WHERE user_id = %s", (bio, interests, user_id))
+        db.commit()
+        flash("Profile updated successfully!", "success")
+        return redirect(url_for("profile"))
+
+    # Fetch pending connection requests and connections (existing code)
     cur.execute("""
         SELECT connections.id, users.username 
         FROM connections 
@@ -49,7 +85,6 @@ def profile():
     """, (user_id,))
     friend_requests = cur.fetchall()
 
-    # Fetch connected users
     cur.execute("""
         SELECT users.id, users.username 
         FROM connections 
@@ -60,17 +95,6 @@ def profile():
         WHERE (connections.sender_id = %s OR connections.receiver_id = %s) AND connections.status = 'accepted'
     """, (user_id, user_id, user_id))
     connections = cur.fetchall()
-
-    # Handle profile update
-    if request.method == "POST":
-        bio = request.form["bio"]
-        interests = request.form["interests"]
-
-        cur.execute("UPDATE profiles SET bio = %s, interests = %s WHERE user_id = %s",
-                    (bio, interests, user_id))
-        db.commit()
-        flash("Profile updated successfully!", "success")
-        return redirect(url_for("profile"))
 
     cur.close()
     db.close()
@@ -104,7 +128,7 @@ def recommendations():
 
     
     cur.execute("""
-        SELECT users.id, users.username, users.email, profiles.bio, profiles.interests 
+        SELECT users.id, users.username, users.email, profiles.bio, profiles.interests, profiles.profile_pic
         FROM users 
         JOIN profiles ON users.id = profiles.user_id 
         WHERE users.id != %s AND REPLACE(profiles.interests, ' ', '') REGEXP %s
@@ -127,8 +151,8 @@ def view_profile(user_id):
     db = get_db()
     cur = db.cursor()
 
-    # Fetch the requested user's profile
-    cur.execute("SELECT users.id, users.username, profiles.bio, profiles.interests FROM users JOIN profiles ON users.id = profiles.user_id WHERE users.id = %s", (user_id,))
+    # Fetch the requested user's profile, including profile_pic
+    cur.execute("SELECT users.id, users.username, profiles.bio, profiles.interests, profiles.profile_pic FROM users JOIN profiles ON users.id = profiles.user_id WHERE users.id = %s", (user_id,))
     profile = cur.fetchone()
 
     if not profile:

@@ -5,7 +5,11 @@
     <ul class="list-group">
         {% for convo in conversations %}
             <li class="list-group-item d-flex justify-content-between align-items-center">
-                <a href="{{ url_for('messages.chat', receiver_id=convo.id) }}">{{ convo.username }}</a>
+                <!-- Profile Picture -->
+                <div class="d-flex align-items-center">
+                    <img src="{% if convo.profile_pic %}{{ url_for('static', filename=convo.profile_pic) }}{% else %}{{ url_for('static', filename='default_profile_pic.png') }}{% endif %}" alt="Profile Picture" class="rounded-circle me-3" style="width: 40px; height: 40px; object-fit: cover;">
+                    <a href="{{ url_for('messages.chat', receiver_id=convo.id) }}">{{ convo.username }}</a>
+                </div>
             </li>
         {% endfor %}
     </ul>
