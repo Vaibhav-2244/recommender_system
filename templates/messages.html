@@ -11,21 +11,24 @@
                 <h5 class="mb-0">Chat with {{ receiver.username }}</h5>
             </div>
             <!-- Online Status -->
-            <span id="online_status" class="badge bg-success">Online</span>
+            <span id="online_status" class="badge bg-secondary">Offline</span>
         </div>
 
         <!-- Chat Messages -->
         <div class="card-body chat-box" id="chat-box" style="height: 400px; overflow-y: auto;">
             {% for msg in messages %}
-                <div class="alert {% if msg.sender_id == session['user_id'] %}alert-primary{% else %}alert-secondary{% endif %}">
-                    {{ msg.content }}
+                <div class="message {% if msg.sender_id == session['user_id'] %}sent{% else %}received{% endif %}">
+                    <div class="message-content">{{ msg.content }}</div>
+                    <div class="message-time">{{ msg.timestamp }}</div>
                 </div>
+                {% if msg.sender_id == session['user_id'] %}
+                <small class="text-muted seen-status" id="seen_status_{{ msg.id }}">Sent</small>
+                {% endif %}
             {% endfor %}
         </div>
 
         <!-- Message Input and Send Button -->
         <div class="card-footer">
-            <small id="typing_status" class="text-muted"></small>
             <div class="input-group mt-2">
                 <input type="text" id="message_input" class="form-control" placeholder="Type a message...">
                 <button class="btn btn-primary" id="send_button">Send</button>
@@ -42,6 +45,30 @@
 
     socket.emit("join", { user_id: sender_id });
 
+    // Check online status periodically
+    setInterval(async () => {
+        const response = await fetch(`/online_status/${receiver_id}`);
+        const data = await response.json();
+        const onlineStatus = document.getElementById("online_status");
+        onlineStatus.innerText = data.status === 'online' ? "Online" : "Offline";
+        onlineStatus.className = `badge bg-${data.status === 'online' ? 'success' : 'secondary'}`;
+    }, 5000);
+
+    // Mark messages as seen when the chat is opened
+    fetch(`/mark_as_seen/${sender_id}/${receiver_id}`, { method: 'POST' });
+
+    // Check if messages are seen
+    setInterval(async () => {
+        const response = await fetch(`/is_seen/${sender_id}/${receiver_id}`);
+        const data = await response.json();
+        if (data.status === 'seen') {
+            document.querySelectorAll('.message.sent').forEach(msg => {
+                const seenStatus = msg.querySelector('.seen-status');
+                if (seenStatus) seenStatus.innerText = "Seen";
+            });
+        }
+    }, 3000);
+
     document.getElementById("send_button").addEventListener("click", function() {
         let messageInput = document.getElementById("message_input");
         let message = messageInput.value.trim();
@@ -51,8 +78,12 @@
             // Add sent message immediately to chatbox
             let chatBox = document.getElementById("chat-box");
             let messageDiv = document.createElement("div");
-            messageDiv.classList.add("alert", "alert-primary");
-            messageDiv.innerText = message;
+            messageDiv.classList.add("message", "sent");
+            messageDiv.innerHTML = `
+                <div class="message-content">${message}</div>
+                <div class="message-time">Just now</div>
+                <small class="text-muted seen-status">Sent</small>
+            `;
             chatBox.appendChild(messageDiv);
             chatBox.scrollTop = chatBox.scrollHeight;
 
@@ -64,17 +95,45 @@
         if (data.sender_id == sender_id || data.receiver_id == sender_id) {
             let chatBox = document.getElementById("chat-box");
             let messageDiv = document.createElement("div");
-            messageDiv.classList.add("alert", data.sender_id == sender_id ? "alert-primary" : "alert-secondary");
-            messageDiv.innerText = data.content;
+            messageDiv.classList.add("message", data.sender_id == sender_id ? "sent" : "received");
+            messageDiv.innerHTML = `
+                <div class="message-content">${data.content}</div>
+                <div class="message-time">Just now</div>
+            `;
             chatBox.appendChild(messageDiv);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
     });
-
-    socket.on("typing_status", function(data) {
-        if (data.receiver_id == sender_id) {
-            document.getElementById("typing_status").innerText = data.is_typing ? "Typing..." : "";
-        }
-    });
 </script>
+
+<style>
+    .message {
+        max-width: 60%;
+        padding: 10px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        position: relative;
+    }
+    .message.sent {
+        background-color: #007bff;
+        color: white;
+        margin-left: auto;
+    }
+    .message.received {
+        background-color: #f1f1f1;
+        margin-right: auto;
+    }
+    .message-time {
+        font-size: 0.8em;
+        color: #666;
+        text-align: right;
+    }
+    .seen-status {
+        display: block;
+        text-align: right;
+        font-size: 0.75em;
+        color: #666;
+        margin-top: 5px;
+    }
+</style>
 {% endblock %}

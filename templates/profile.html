@@ -15,13 +15,23 @@
                 <form method="POST" enctype="multipart/form-data">
                     <div class="row">
                         <!-- Profile Picture Section (Left Side) -->
-                        <div class="col-md-3 text-center">
+                        <div class="col-md-3 text-center position-relative">
                             <label for="profile_pic_upload" style="cursor: pointer;">
-                                {% if profile.profile_pic %}
-                                    <img id="profile_pic_preview" src="{{ url_for('static', filename=profile.profile_pic) }}" alt="Profile Picture" class="img-fluid rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
-                                {% else %}
-                                    <img src="{{ url_for('static', filename='default_profile_pic.png') }}" alt="Default Profile Picture" class="img-fluid rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
-                                {% endif %}
+                                <div class="profile-pic-container">
+                                    {% if profile.profile_pic %}
+                                        <img id="profile_pic_preview" src="{{ url_for('static', filename=profile.profile_pic) }}" alt="Profile Picture" class="img-fluid rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
+                                        <!-- Delete Icon -->
+                                        <div class="delete-icon" onclick="removeProfilePicture()">
+                                            <i class="fas fa-trash"></i>
+                                        </div>
+                                    {% else %}
+                                        <img id="profile_pic_preview" src="{{ url_for('static', filename='default_profile_pic.png') }}" alt="Default Profile Picture" class="img-fluid rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
+                                        <!-- Overlay with Camera Icon -->
+                                        <div id="profile_pic_overlay" class="profile-pic-overlay">
+                                            <i class="fas fa-camera"></i>
+                                        </div>
+                                    {% endif %}
+                                </div>
                             </label>
                             <!-- Hidden File Input for Profile Picture -->
                             <input type="file" id="profile_pic_upload" name="profile_pic" style="display: none;">
@@ -48,8 +58,16 @@
                     <div style="max-height: 200px; overflow-y: auto;">
                         {% for request in friend_requests %}
                             <div class="d-flex justify-content-between align-items-center border p-2 mb-2">
-                                <span>{{ request.username }}</span>
-                                <div>
+                                <!-- Clickable Username and Email Section -->
+                                <a href="{{ url_for('view_profile', user_id=request.sender_id) }}" class="text-decoration-none flex-grow-1 me-3">
+                                    <div class="d-flex flex-column">
+                                        <span class="fw-bold">{{ request.username }}</span>
+                                        <span class="text-muted">{{ request.email }}</span>
+                                    </div>
+                                </a>
+
+                                <!-- Accept/Decline Buttons -->
+                                <div class="d-flex gap-2">
                                     <a href="{{ url_for('respond_request', request_id=request.id, action='accept') }}" class="btn btn-success btn-sm">Accept</a>
                                     <a href="{{ url_for('respond_request', request_id=request.id, action='decline') }}" class="btn btn-danger btn-sm">Decline</a>
                                 </div>
@@ -131,21 +149,123 @@
         }
     });
 
-        // Preview selected profile picture
-        document.getElementById("profile_pic_upload").addEventListener("change", function(event) {
-            const file = event.target.files[0]; // Get the selected file
-            if (file) {
-                const reader = new FileReader(); // Create a FileReader to read the file
-    
-                // Set up the FileReader onload event
-                reader.onload = function(e) {
-                    // Update the src attribute of the profile picture preview
-                    document.getElementById("profile_pic_preview").src = e.target.result;
-                };
-    
-                // Read the file as a Data URL (base64 encoded)
-                reader.readAsDataURL(file);
-            }
-        });
+    // Preview selected profile picture
+    document.getElementById("profile_pic_upload").addEventListener("change", function(event) {
+        const file = event.target.files[0]; // Get the selected file
+        if (file) {
+            const reader = new FileReader(); // Create a FileReader to read the file
+
+            // Set up the FileReader onload event
+            reader.onload = function(e) {
+                // Update the src attribute of the profile picture preview
+                document.getElementById("profile_pic_preview").src = e.target.result;
+            };
+
+            // Read the file as a Data URL (base64 encoded)
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // Function to remove profile picture
+    function removeProfilePicture() {
+        if (confirm("Are you sure you want to remove your profile picture?")) {
+            fetch("/remove_profile_pic", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Reload the page to reflect changes
+                    window.location.reload();
+                } else {
+                    alert("Failed to remove profile picture.");
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+            });
+        }
+    }
+    // Preview selected profile picture
+document.getElementById("profile_pic_upload").addEventListener("change", function(event) {
+    const file = event.target.files[0]; // Get the selected file
+    if (file) {
+        const reader = new FileReader(); // Create a FileReader to read the file
+
+        // Set up the FileReader onload event
+        reader.onload = function(e) {
+            // Update the src attribute of the profile picture preview
+            document.getElementById("profile_pic_preview").src = e.target.result;
+
+            // Hide the hover effect (camera icon overlay)
+            document.getElementById("profile_pic_overlay").style.display = "none";
+        };
+
+        // Read the file as a Data URL (base64 encoded)
+        reader.readAsDataURL(file);
+    }
+});
 </script>
+
+<!-- Add Font Awesome for Icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<!-- Add Custom CSS -->
+<style>
+    .profile-pic-container {
+        position: relative;
+        display: inline-block;
+    }
+
+    .profile-pic-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .profile-pic-overlay i {
+        color: white;
+        font-size: 24px;
+    }
+
+    .profile-pic-container:hover .profile-pic-overlay {
+        opacity: 1;
+    }
+
+    .delete-icon {
+        position: absolute;
+        top: 0;
+        right: 0;
+        background: rgba(255, 0, 0, 0.7);
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+
+    .delete-icon:hover {
+        background: rgba(255, 0, 0, 1);
+    }
+
+    .delete-icon i {
+        color: white;
+        font-size: 14px;
+    }
+</style>
 {% endblock %}

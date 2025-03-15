@@ -1,4 +1,4 @@
-from flask import Flask, render_template, session, redirect, url_for, request, flash, Blueprint
+from flask import Flask, render_template, session, redirect, url_for, request, flash, Blueprint, jsonify
 from auth import auth
 from database import get_db
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -78,7 +78,7 @@ def profile():
 
     # Fetch pending connection requests and connections (existing code)
     cur.execute("""
-        SELECT connections.id, users.username 
+        SELECT connections.id, users.username, users.email, connections.sender_id 
         FROM connections 
         JOIN users ON users.id = connections.sender_id 
         WHERE connections.receiver_id = %s AND connections.status = 'pending'
@@ -157,7 +157,7 @@ def view_profile(user_id):
 
     if not profile:
         flash("Profile not found.", "danger")
-        return redirect(url_for("recommendations"))
+        return redirect(url_for("profile"))
 
     # Check connection status
     cur.execute("SELECT status FROM connections WHERE (sender_id = %s AND receiver_id = %s) OR (sender_id = %s AND receiver_id = %s)", (current_user_id, user_id, user_id, current_user_id))
@@ -268,6 +268,64 @@ def disconnect(user_id):
     flash("You are no longer connected.", "info")
     return redirect(url_for("view_profile", user_id=user_id))
 
+@app.route("/remove_profile_pic", methods=["POST"])
+def remove_profile_pic():
+    if "user_id" not in session:
+        return jsonify({"success": False, "message": "Please log in first."})
+
+    user_id = session["user_id"]
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        # Set profile_pic to NULL in the database
+        cur.execute("UPDATE profiles SET profile_pic = NULL WHERE user_id = %s", (user_id,))
+        db.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        db.rollback()
+        return jsonify({"success": False, "message": str(e)})
+    finally:
+        cur.close()
+        db.close()
+
+@app.route("/search_users")
+def search_users():
+    if "user_id" not in session:
+        return jsonify({"error": "Please log in first."})
+
+    query = request.args.get("q", "").strip()
+    if not query:
+        return jsonify({"error": "Please enter a search term."})
+
+    db = get_db()
+    cur = db.cursor()
+
+    # Search for users by username or email
+    cur.execute("""
+        SELECT users.id, users.username, users.email, profiles.bio, profiles.profile_pic 
+        FROM users 
+        JOIN profiles ON users.id = profiles.user_id 
+        WHERE users.username LIKE %s OR users.email LIKE %s
+        LIMIT 10
+    """, (f"%{query}%", f"%{query}%"))
+
+    users = cur.fetchall()
+    cur.close()
+    db.close()
+
+    # Convert the result to a list of dictionaries
+    users_list = []
+    for user in users:
+        users_list.append({
+            "id": user["id"],
+            "username": user["username"],
+            "email": user["email"],
+            "bio": user["bio"],
+            "profile_pic": user["profile_pic"]
+        })
+
+    return jsonify(users_list)
 
 if __name__ == "__main__":
     socketio.run(app, debug=True)
