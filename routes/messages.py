@@ -94,14 +94,38 @@ def inbox():
     db = get_db()
     cursor = db.cursor()
 
-    # Fetch unique users who had a conversation
+    # Fetch unique users who had a conversation with their last message
     cursor.execute("""
-        SELECT DISTINCT u.id, u.username, p.profile_pic
+        WITH LastMessages AS (
+            SELECT 
+                CASE 
+                    WHEN m.sender_id = %s THEN m.receiver_id
+                    ELSE m.sender_id
+                END as other_user_id,
+                m.content as last_message,
+                m.timestamp as last_message_time,
+                ROW_NUMBER() OVER (
+                    PARTITION BY CASE 
+                        WHEN m.sender_id = %s THEN m.receiver_id
+                        ELSE m.sender_id
+                    END 
+                    ORDER BY m.timestamp DESC
+                ) as rn
+            FROM messages m
+            WHERE m.sender_id = %s OR m.receiver_id = %s
+        )
+        SELECT 
+            u.id,
+            u.username,
+            p.profile_pic,
+            lm.last_message,
+            lm.last_message_time
         FROM users u
         JOIN profiles p ON u.id = p.user_id
-        JOIN messages m ON (u.id = m.sender_id OR u.id = m.receiver_id)
-        WHERE (m.sender_id = %s OR m.receiver_id = %s) AND u.id != %s
-    """, (user_id, user_id, user_id))
+        JOIN LastMessages lm ON u.id = lm.other_user_id
+        WHERE lm.rn = 1
+        ORDER BY lm.last_message_time DESC
+    """, (user_id, user_id, user_id, user_id))
     
     conversations = cursor.fetchall()
     db.close()
@@ -175,8 +199,27 @@ def mark_as_seen(sender_id, receiver_id):
 # 🔹 Check if Messages are Seen
 @messages_bp.route('/is_seen/<int:sender_id>/<int:receiver_id>')
 def is_seen(sender_id, receiver_id):
-    last_seen = message_read_status.get((sender_id, receiver_id), None)
-    if last_seen:
-        return jsonify({'status': 'seen', 'last_seen': last_seen})
-    else:
+    if 'user_id' not in session or session['user_id'] != receiver_id:
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+
+    # Check if there are any unseen messages from sender to receiver
+    db = get_db()
+    cursor = db.cursor()
+    
+    # Get the last seen timestamp from memory
+    last_seen = message_read_status.get((sender_id, receiver_id), datetime.min)
+    
+    cursor.execute("""
+        SELECT COUNT(*) as unseen_count
+        FROM messages
+        WHERE sender_id = %s AND receiver_id = %s
+        AND timestamp > %s
+    """, (sender_id, receiver_id, last_seen))
+    
+    result = cursor.fetchone()
+    db.close()
+    
+    if result['unseen_count'] > 0:
         return jsonify({'status': 'unseen'})
+    else:
+        return jsonify({'status': 'seen'})

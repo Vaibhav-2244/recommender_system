@@ -45,6 +45,25 @@
 
     socket.emit("join", { user_id: sender_id });
 
+    // Mark messages as seen when the chat is opened
+    async function markMessagesAsSeen() {
+        try {
+            const response = await fetch(`/mark_as_seen/${receiver_id}/${sender_id}`, { method: 'POST' });
+            if (response.ok) {
+                // Update UI to show messages as seen
+                document.querySelectorAll('.message.sent').forEach(msg => {
+                    const seenStatus = msg.querySelector('.seen-status');
+                    if (seenStatus) seenStatus.innerText = "Seen";
+                });
+            }
+        } catch (error) {
+            console.error('Error marking messages as seen:', error);
+        }
+    }
+
+    // Call markMessagesAsSeen when the chat is opened
+    markMessagesAsSeen();
+
     // Check online status periodically
     setInterval(async () => {
         const response = await fetch(`/online_status/${receiver_id}`);
@@ -53,21 +72,6 @@
         onlineStatus.innerText = data.status === 'online' ? "Online" : "Offline";
         onlineStatus.className = `badge bg-${data.status === 'online' ? 'success' : 'secondary'}`;
     }, 5000);
-
-    // Mark messages as seen when the chat is opened
-    fetch(`/mark_as_seen/${sender_id}/${receiver_id}`, { method: 'POST' });
-
-    // Check if messages are seen
-    setInterval(async () => {
-        const response = await fetch(`/is_seen/${sender_id}/${receiver_id}`);
-        const data = await response.json();
-        if (data.status === 'seen') {
-            document.querySelectorAll('.message.sent').forEach(msg => {
-                const seenStatus = msg.querySelector('.seen-status');
-                if (seenStatus) seenStatus.innerText = "Seen";
-            });
-        }
-    }, 3000);
 
     document.getElementById("send_button").addEventListener("click", function() {
         let messageInput = document.getElementById("message_input");
@@ -102,6 +106,11 @@
             `;
             chatBox.appendChild(messageDiv);
             chatBox.scrollTop = chatBox.scrollHeight;
+
+            // If the message is received, mark it as seen immediately
+            if (data.sender_id != sender_id) {
+                markMessagesAsSeen();
+            }
         }
     });
 </script>

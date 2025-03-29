@@ -2,16 +2,101 @@
 {% block content %}
 <div class="container mt-4">
     <h3>Inbox</h3>
-    <ul class="list-group">
+    <div class="list-group">
         {% for convo in conversations %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <!-- Profile Picture -->
-                <div class="d-flex align-items-center">
-                    <img src="{% if convo.profile_pic %}{{ url_for('static', filename=convo.profile_pic) }}{% else %}{{ url_for('static', filename='default_profile_pic.png') }}{% endif %}" alt="Profile Picture" class="rounded-circle me-3" style="width: 40px; height: 40px; object-fit: cover;">
-                    <a href="{{ url_for('messages.chat', receiver_id=convo.id) }}">{{ convo.username }}</a>
+            <a href="{{ url_for('messages.chat', receiver_id=convo.id) }}" class="list-group-item list-group-item-action" data-conversation-id="{{ convo.id }}">
+                <div class="d-flex justify-content-between align-items-center">
+                    <!-- Left side: Profile picture and username -->
+                    <div class="d-flex align-items-center">
+                        <img src="{% if convo.profile_pic %}{{ url_for('static', filename=convo.profile_pic) }}{% else %}{{ url_for('static', filename='default_profile_pic.png') }}{% endif %}" 
+                             alt="Profile Picture" 
+                             class="rounded-circle me-3" 
+                             style="width: 50px; height: 50px; object-fit: cover;">
+                        <div>
+                            <h6 class="mb-1">{{ convo.username }}</h6>
+                            <p class="mb-1 text-muted" style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                {{ convo.last_message }}
+                            </p>
+                        </div>
+                    </div>
+                    <!-- Right side: Timestamp and unseen indicator -->
+                    <div class="d-flex align-items-center">
+                        <div class="text-muted small me-3">
+                            {{ convo.last_message_time.strftime('%b %d, %Y %I:%M %p') }}
+                        </div>
+                        <div class="unseen-badge d-none">
+                            <span class="badge bg-primary rounded-circle">•</span>
+                        </div>
+                    </div>
                 </div>
-            </li>
+            </a>
         {% endfor %}
-    </ul>
+    </div>
 </div>
+
+<script>
+    // Function to check message status for each conversation
+    async function checkMessageStatus() {
+        const conversations = document.querySelectorAll('.list-group-item');
+        for (const convo of conversations) {
+            const senderId = convo.dataset.conversationId;
+            try {
+                const response = await fetch(`/is_seen/${senderId}/{{ session['user_id'] }}`);
+                if (!response.ok) {
+                    console.error('Failed to check message status');
+                    continue;
+                }
+                
+                const data = await response.json();
+                const unseenBadge = convo.querySelector('.unseen-badge');
+                
+                if (data.status === 'unseen') {
+                    convo.classList.add('unseen-message');
+                    unseenBadge.classList.remove('d-none');
+                } else {
+                    convo.classList.remove('unseen-message');
+                    unseenBadge.classList.add('d-none');
+                }
+            } catch (error) {
+                console.error('Error checking message status:', error);
+            }
+        }
+    }
+
+    // Check message status initially
+    checkMessageStatus();
+
+    // Check message status periodically
+    setInterval(checkMessageStatus, 5000);
+</script>
+
+<style>
+    .list-group-item {
+        border-left: none;
+        border-right: none;
+        padding: 1rem;
+        transition: background-color 0.3s ease;
+    }
+    .list-group-item:hover {
+        background-color: #f8f9fa;
+    }
+    .list-group-item:first-child {
+        border-top: none;
+    }
+    .list-group-item:last-child {
+        border-bottom: none;
+    }
+    .unseen-message {
+        background-color: #e8f4ff;
+    }
+    .unseen-message:hover {
+        background-color: #d1e9ff;
+    }
+    .unseen-badge .badge {
+        width: 8px;
+        height: 8px;
+        padding: 0;
+        background-color: #0d6efd;
+    }
+</style>
 {% endblock %}
