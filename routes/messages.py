@@ -2,6 +2,12 @@ from flask import Blueprint, render_template, request, redirect, url_for, sessio
 from database import get_db
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from datetime import datetime, timedelta
+import logging
+from .smart_reply import get_smart_reply
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 messages_bp = Blueprint('messages', __name__)
 socketio = SocketIO()
@@ -223,3 +229,22 @@ def is_seen(sender_id, receiver_id):
         return jsonify({'status': 'unseen'})
     else:
         return jsonify({'status': 'seen'})
+
+# Add new route for getting smart replies
+@messages_bp.route('/get_smart_reply', methods=['POST'])
+def get_smart_reply_endpoint():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+    
+    message = request.json.get('message', '')
+    if not message:
+        return jsonify({'status': 'error', 'message': 'No message provided'}), 400
+    
+    try:
+        logger.info(f"Received request for smart reply with message: {message}")
+        suggestions = get_smart_reply(message)
+        logger.info(f"Returning suggestions: {suggestions}")
+        return jsonify({'status': 'success', 'suggestions': suggestions})
+    except Exception as e:
+        logger.error(f"Error in get_smart_reply_endpoint: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500

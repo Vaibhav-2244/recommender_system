@@ -20,6 +20,13 @@
                 <div class="message {% if msg.sender_id == session['user_id'] %}sent{% else %}received{% endif %}">
                     <div class="message-content">{{ msg.content }}</div>
                     <div class="message-time">{{ msg.timestamp }}</div>
+                    {% if msg.sender_id != session['user_id'] %}
+                    <div class="suggestions-container" style="display: none;">
+                        <div class="suggestions-wrapper">
+                            <div class="suggestions-list"></div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
                 {% if msg.sender_id == session['user_id'] %}
                 <small class="text-muted seen-status" id="seen_status_{{ msg.id }}">Sent</small>
@@ -42,6 +49,9 @@
     var socket = io();
     var sender_id = "{{ session['user_id'] }}";
     var receiver_id = "{{ receiver.id }}";
+    var lastReceivedMessageId = null;
+    var currentSuggestionsContainer = null;
+    var lastReceivedMessageElement = null;
 
     socket.emit("join", { user_id: sender_id });
 
@@ -73,6 +83,147 @@
         onlineStatus.className = `badge bg-${data.status === 'online' ? 'success' : 'secondary'}`;
     }, 5000);
 
+    // Function to hide all suggestions
+    function hideAllSuggestions() {
+        document.querySelectorAll('.suggestions-container').forEach(container => {
+            container.style.display = 'none';
+        });
+        currentSuggestionsContainer = null;
+    }
+
+    // Function to get smart replies from the server
+    async function getSmartReplies(message) {
+        try {
+            console.log('Requesting smart replies for message:', message);
+            const response = await fetch('/get_smart_reply', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ message: message })
+            });
+            const data = await response.json();
+            console.log('Received smart replies:', data);
+            if (data.status === 'success') {
+                return data.suggestions;
+            } else {
+                console.error('Error getting smart replies:', data.message);
+                return [];
+            }
+        } catch (error) {
+            console.error('Error getting smart replies:', error);
+            return [];
+        }
+    }
+
+    // Function to show suggestions for a message
+    async function showSuggestions(messageElement) {
+        console.log('Showing suggestions for message element:', messageElement);
+        // Hide any existing suggestions first
+        hideAllSuggestions();
+
+        const messageContent = messageElement.querySelector('.message-content').textContent;
+        const suggestionsContainer = messageElement.querySelector('.suggestions-container');
+        const suggestionsList = messageElement.querySelector('.suggestions-list');
+        
+        if (!suggestionsContainer || !suggestionsList) {
+            console.error('Missing suggestions container or list');
+            return;
+        }
+
+        // Get smart replies from the server
+        const suggestions = await getSmartReplies(messageContent);
+        console.log('Received suggestions:', suggestions);
+        
+        if (suggestions.length === 0) {
+            console.log('No suggestions received');
+            suggestionsContainer.style.display = 'none';
+            return;
+        }
+
+        suggestionsList.innerHTML = '';
+        
+        suggestions.forEach(suggestion => {
+            const suggestionButton = document.createElement('button');
+            suggestionButton.className = 'suggestion-btn';
+            suggestionButton.textContent = suggestion;
+            suggestionButton.onclick = () => {
+                document.getElementById('message_input').value = suggestion;
+                hideAllSuggestions();
+            };
+            suggestionsList.appendChild(suggestionButton);
+        });
+
+        suggestionsContainer.style.display = 'block';
+        currentSuggestionsContainer = suggestionsContainer;
+
+        // Scroll to show suggestions
+        const chatBox = document.getElementById('chat-box');
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // Function to make a message clickable
+    function makeMessageClickable(messageElement) {
+        messageElement.style.cursor = 'pointer';
+        messageElement.addEventListener('click', () => {
+            showSuggestions(messageElement);
+        });
+    }
+
+    // Function to remove clickable from a message
+    function removeMessageClickable(messageElement) {
+        messageElement.style.cursor = 'default';
+        messageElement.removeEventListener('click', () => {
+            showSuggestions(messageElement);
+        });
+    }
+
+    // Modify the existing socket.on("receive_message") handler
+    socket.on("receive_message", function(data) {
+        console.log('Received message:', data);
+        if (data.sender_id == sender_id || data.receiver_id == sender_id) {
+            let chatBox = document.getElementById("chat-box");
+            let messageDiv = document.createElement("div");
+            messageDiv.classList.add("message", data.sender_id == sender_id ? "sent" : "received");
+            
+            // Create the message HTML with suggestions container
+            let messageHTML = `
+                <div class="message-content">${data.content}</div>
+                <div class="message-time">Just now</div>
+            `;
+            
+            // Add suggestions container for received messages
+            if (data.sender_id != sender_id) {
+                messageHTML += `
+                    <div class="suggestions-container">
+                        <div class="suggestions-wrapper">
+                            <div class="suggestions-list"></div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            messageDiv.innerHTML = messageHTML;
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // Handle clickable messages
+            if (data.sender_id != sender_id) {
+                // Remove clickable from previous last message
+                if (lastReceivedMessageElement) {
+                    removeMessageClickable(lastReceivedMessageElement);
+                }
+                
+                // Make new message clickable
+                makeMessageClickable(messageDiv);
+                lastReceivedMessageElement = messageDiv;
+                lastReceivedMessageId = data.id;
+                markMessagesAsSeen();
+            }
+        }
+    });
+
+    // Modify the send button click handler
     document.getElementById("send_button").addEventListener("click", function() {
         let messageInput = document.getElementById("message_input");
         let message = messageInput.value.trim();
@@ -91,26 +242,20 @@
             chatBox.appendChild(messageDiv);
             chatBox.scrollTop = chatBox.scrollHeight;
 
+            // Hide all suggestions when sending a message
+            hideAllSuggestions();
             messageInput.value = "";
         }
     });
 
-    socket.on("receive_message", function(data) {
-        if (data.sender_id == sender_id || data.receiver_id == sender_id) {
-            let chatBox = document.getElementById("chat-box");
-            let messageDiv = document.createElement("div");
-            messageDiv.classList.add("message", data.sender_id == sender_id ? "sent" : "received");
-            messageDiv.innerHTML = `
-                <div class="message-content">${data.content}</div>
-                <div class="message-time">Just now</div>
-            `;
-            chatBox.appendChild(messageDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
-
-            // If the message is received, mark it as seen immediately
-            if (data.sender_id != sender_id) {
-                markMessagesAsSeen();
-            }
+    // Add click handler for existing received messages
+    document.addEventListener('DOMContentLoaded', function() {
+        const receivedMessages = document.querySelectorAll('.message.received');
+        if (receivedMessages.length > 0) {
+            // Make only the last received message clickable
+            const lastMessage = receivedMessages[receivedMessages.length - 1];
+            makeMessageClickable(lastMessage);
+            lastReceivedMessageElement = lastMessage;
         }
     });
 </script>
@@ -131,11 +276,24 @@
     .message.received {
         background-color: #f1f1f1;
         margin-right: auto;
+        padding-bottom: 60px;
+        position: relative;
+        transition: background-color 0.2s ease;
+    }
+    .message.received:not(.clickable) {
+        cursor: default;
+    }
+    .message.received.clickable {
+        cursor: pointer;
+    }
+    .message.received:hover {
+        background-color: #e9ecef;
     }
     .message-time {
         font-size: 0.8em;
         color: #666;
         text-align: right;
+        margin-top: 5px;
     }
     .seen-status {
         display: block;
@@ -143,6 +301,51 @@
         font-size: 0.75em;
         color: #666;
         margin-top: 5px;
+    }
+    .suggestions-container {
+        margin-top: 8px;
+        padding: 8px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: none;
+        z-index: 1000;
+        position: absolute;
+        bottom: -50px;
+        left: 0;
+        right: 0;
+        min-height: 40px;
+    }
+
+    .suggestions-wrapper {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-start;
+        padding: 5px;
+    }
+
+    .suggestion-btn {
+        background-color: #e9ecef;
+        border: 1px solid #dee2e6;
+        border-radius: 16px;
+        padding: 6px 12px;
+        font-size: 0.9em;
+        color: #495057;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+        margin: 2px;
+    }
+
+    .suggestion-btn:hover {
+        background-color: #dee2e6;
+        transform: translateY(-1px);
+    }
+
+    /* Ensure chat box has enough space for suggestions */
+    .chat-box {
+        padding-bottom: 80px;
     }
 </style>
 {% endblock %}
