@@ -1,8 +1,10 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, session, jsonify, current_app
 from database import get_db
+import numpy as np
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from datetime import datetime, timedelta
 import logging
+import json
 from .smart_reply import get_smart_reply
 
 # Set up logging
@@ -15,7 +17,7 @@ socketio = SocketIO()
 # In-memory storage for user activity
 user_activity = {}
 
-# 🔹 Open Chat Page
+# Open Chat Page
 @messages_bp.route('/chat/<int:receiver_id>')
 def chat(receiver_id):
     if 'user_id' not in session:
@@ -50,7 +52,7 @@ def chat(receiver_id):
     
     return render_template('messages.html', receiver=receiver, messages=messages)
 
-# 🔹 REST API to send a message
+# REST API to send a message
 @messages_bp.route('/send_message', methods=['POST'])
 def send_message():
     if 'user_id' not in session:
@@ -59,38 +61,72 @@ def send_message():
     sender_id = session['user_id']
     receiver_id = request.json['receiver_id']
     content = request.json['content']
+    db = None
+    cursor = None
 
-    db = get_db()
-    cursor = db.cursor()
-    
-    # Insert message into the database
-    cursor.execute("INSERT INTO messages (sender_id, receiver_id, content) VALUES (%s, %s, %s)",
-                   (sender_id, receiver_id, content))
-    db.commit()
+    try:
+        # Spam detection
+        is_spam = False
+        spam_confidence = 0.0
+        spam_features = None
+        
+        if hasattr(current_app, 'spam_detector') and current_app.spam_detector:
+            result = current_app.spam_detector.detect(content)
+            is_spam = result['is_spam']
+            spam_confidence = result['confidence']
+            spam_features = json.dumps(result['features'])
 
-    # Get the latest message ID
-    cursor.execute("SELECT LAST_INSERT_ID()")
-    message_id = cursor.fetchone()[0]
+        db = get_db()
+        cursor = db.cursor()
 
-    db.close()
+        # Insert message
+        cursor.execute("""
+            INSERT INTO messages 
+            (sender_id, receiver_id, content, is_spam, spam_confidence, spam_features)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (sender_id, receiver_id, content, is_spam, spam_confidence, spam_features))
 
-    message_data = {
-        'id': message_id,
-        'sender_id': sender_id,
-        'receiver_id': receiver_id,
-        'content': content
-    }
+        db.commit()
 
-    # Emit message to both sender and receiver rooms
-    socketio.emit('receive_message', message_data, room=str(sender_id))
-    socketio.emit('receive_message', message_data, room=str(receiver_id))
+        # Get message ID
+        cursor.execute("SELECT LAST_INSERT_ID() as id")
+        message_id = cursor.fetchone()['id']
 
-    # Update sender's last activity
-    user_activity[sender_id] = datetime.now()
+        # Get current spam count for receiver
+        cursor.execute("""
+            SELECT COUNT(*) as spam_count 
+            FROM messages 
+            WHERE receiver_id = %s AND is_spam = TRUE
+        """, (receiver_id,))
+        spam_count = cursor.fetchone()['spam_count']
 
-    return jsonify({'status': 'success', 'message': message_data})
+        message_data = {
+            'id': message_id,
+            'sender_id': sender_id,
+            'receiver_id': receiver_id,
+            'content': content,
+            'is_spam': is_spam,
+            'spam_confidence': spam_confidence
+        }
 
-# 🔹 Inbox Route
+        # Emit messages
+        # socketio.emit('receive_message', message_data, room=str(sender_id))
+        if not is_spam:
+            socketio.emit('receive_message', message_data, room=str(receiver_id))
+        else:
+            socketio.emit('new_spam', {'count': spam_count}, room=str(receiver_id))
+
+        return jsonify({'status': 'success', 'message': message_data})
+
+    except Exception as e:
+        current_app.logger.error(f"Error in send_message: {str(e)}", exc_info=True)
+        if db: db.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        if cursor: cursor.close()
+        if db: db.close()
+
+# Inbox Route
 @messages_bp.route('/inbox')
 def inbox():
     if 'user_id' not in session:
@@ -139,9 +175,9 @@ def inbox():
     # Update user's last activity
     user_activity[user_id] = datetime.now()
     
-    return render_template('inbox.html', conversations=conversations)
+    return render_template('inbox.html', conversations=conversations, user_id=user_id)
 
-# 🔹 WebSocket: Join Room
+# WebSocket: Join Room
 @socketio.on('join')
 def join(data):
     room = str(data['user_id'])
@@ -151,36 +187,77 @@ def join(data):
     # Update user's last activity
     user_activity[data['user_id']] = datetime.now()
 
-# 🔹 WebSocket: Send Message (Ensure Storage in DB)
+# WebSocket: Send Message (Ensure Storage in DB)
 @socketio.on('send_message')
 def handle_message(data):
     sender_id = data['sender_id']
     receiver_id = data['receiver_id']
     content = data['content']
+    db = None
+    cursor = None
 
-    db = get_db()
-    cursor = db.cursor()
-    
-    # Insert into database
-    cursor.execute("INSERT INTO messages (sender_id, receiver_id, content) VALUES (%s, %s, %s)",
-                   (sender_id, receiver_id, content))
-    db.commit()
+    try:
+        # Spam detection
+        is_spam = False
+        spam_confidence = 0.0
+        spam_features = None
+        
+        if hasattr(current_app, 'spam_detector') and current_app.spam_detector:
+            result = current_app.spam_detector.detect(content)
+            is_spam = result['is_spam']
+            spam_confidence = result['confidence']
+            spam_features = json.dumps(result['features'])
 
-    cursor.execute("SELECT LAST_INSERT_ID()")
-    message_id = cursor.fetchone()[0]
+        db = get_db()
+        cursor = db.cursor()
 
-    db.close()
+        # Insert message
+        cursor.execute("""
+            INSERT INTO messages 
+            (sender_id, receiver_id, content, is_spam, spam_confidence, spam_features)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (sender_id, receiver_id, content, is_spam, spam_confidence, spam_features))
 
-    message_data = {'id': message_id, 'sender_id': sender_id, 'receiver_id': receiver_id, 'content': content}
+        db.commit()
 
-    # Emit message to both users
-    emit('receive_message', message_data, room=str(sender_id))
-    emit('receive_message', message_data, room=str(receiver_id))
+        # Get message ID
+        cursor.execute("SELECT LAST_INSERT_ID() as id")
+        message_id = cursor.fetchone()['id']
 
-    # Update sender's last activity
-    user_activity[sender_id] = datetime.now()
+        # Get current spam count for receiver
+        cursor.execute("""
+            SELECT COUNT(*) as spam_count 
+            FROM messages 
+            WHERE receiver_id = %s AND is_spam = TRUE
+        """, (receiver_id,))
+        spam_count = cursor.fetchone()['spam_count']
 
-# 🔹 Check Online Status
+        message_data = {
+            'id': message_id,
+            'sender_id': sender_id,
+            'receiver_id': receiver_id,
+            'content': content,
+            'is_spam': is_spam,
+            'spam_confidence': spam_confidence
+        }
+
+        # Emit messages
+        if not is_spam:
+            socketio.emit('receive_message', message_data, room=str(receiver_id))
+        else:
+            socketio.emit('new_spam', {'count': spam_count}, room=str(receiver_id))
+        
+        # socketio.emit('receive_message', message_data, room=str(sender_id))
+
+    except Exception as e:
+        current_app.logger.error(f"Error in handle_message: {str(e)}", exc_info=True)
+        if db: db.rollback()
+        emit('error', {'message': str(e)}, room=str(sender_id))
+    finally:
+        if cursor: cursor.close()
+        if db: db.close()
+
+# Check Online Status
 @messages_bp.route('/online_status/<int:user_id>')
 def online_status(user_id):
     last_seen = user_activity.get(user_id, None)
@@ -192,7 +269,7 @@ def online_status(user_id):
 # In-memory storage for message read status
 message_read_status = {}
 
-# 🔹 Mark Messages as Seen
+# Mark Messages as Seen
 @messages_bp.route('/mark_as_seen/<int:sender_id>/<int:receiver_id>', methods=['POST'])
 def mark_as_seen(sender_id, receiver_id):
     if 'user_id' not in session or session['user_id'] != receiver_id:
@@ -202,7 +279,7 @@ def mark_as_seen(sender_id, receiver_id):
     message_read_status[(sender_id, receiver_id)] = datetime.now()
     return jsonify({'status': 'success'})
 
-# 🔹 Check if Messages are Seen
+# Check if Messages are Seen
 @messages_bp.route('/is_seen/<int:sender_id>/<int:receiver_id>')
 def is_seen(sender_id, receiver_id):
     if 'user_id' not in session or session['user_id'] != receiver_id:
@@ -248,3 +325,57 @@ def get_smart_reply_endpoint():
     except Exception as e:
         logger.error(f"Error in get_smart_reply_endpoint: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
+    
+
+    # Get message details
+@messages_bp.route('/message_details/<int:message_id>')
+def message_details(message_id):
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    
+    cursor.execute("""
+        SELECT m.*, u.username as sender_username, p.profile_pic
+        FROM messages m
+        JOIN users u ON m.sender_id = u.id
+        JOIN profiles p ON u.id = p.user_id
+        WHERE m.id = %s
+    """, (message_id,))
+    
+    message = cursor.fetchone()
+    db.close()
+    
+    if not message:
+        return jsonify({'status': 'error', 'message': 'Message not found'}), 404
+    
+    # Convert datetime to string for JSON serialization
+    if 'timestamp' in message:
+        message['timestamp'] = message['timestamp'].isoformat()
+    
+    return jsonify({'status': 'success', 'message': message})
+
+# Mark message as not spam
+@messages_bp.route('/report_not_spam/<int:message_id>', methods=['POST'])
+def report_not_spam(message_id):
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        
+        # Update message in database
+        cursor.execute("""
+            UPDATE messages 
+            SET is_spam = FALSE,
+                spam_confidence = 0.0
+            WHERE id = %s
+        """, (message_id,))
+        
+        db.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error reporting not spam: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    
+    

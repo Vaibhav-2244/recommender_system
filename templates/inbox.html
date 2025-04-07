@@ -2,42 +2,118 @@
 {% block content %}
 <div class="container mt-4">
     <h3>Inbox</h3>
-    <div class="list-group">
-        {% for convo in conversations %}
-            <a href="{{ url_for('messages.chat', receiver_id=convo.id) }}" class="list-group-item list-group-item-action" data-conversation-id="{{ convo.id }}">
-                <div class="d-flex justify-content-between align-items-center">
-                    <!-- Left side: Profile picture and username -->
-                    <div class="d-flex align-items-center">
-                        <img src="{% if convo.profile_pic %}{{ url_for('static', filename=convo.profile_pic) }}{% else %}{{ url_for('static', filename='default_profile_pic.png') }}{% endif %}" 
-                             alt="Profile Picture" 
-                             class="rounded-circle me-3" 
-                             style="width: 50px; height: 50px; object-fit: cover;">
-                        <div>
-                            <h6 class="mb-1">{{ convo.username }}</h6>
-                            <p class="mb-1 text-muted" style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                {{ convo.last_message }}
-                            </p>
+    
+    <!-- Tab navigation -->
+    <ul class="nav nav-tabs mb-4" id="inboxTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="regular-tab" data-bs-toggle="tab" data-bs-target="#regular" type="button" role="tab">Regular Messages</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="spam-tab" data-bs-toggle="tab" data-bs-target="#spam" type="button" role="tab">Spam <span class="badge bg-danger" id="spam-count">0</span></button>
+        </li>
+    </ul>
+    
+    <!-- Tab content -->
+    <div class="tab-content" id="inboxTabsContent">
+        <!-- Regular messages tab -->
+        <div class="tab-pane fade show active" id="regular" role="tabpanel">
+            <div class="list-group" id="regular-messages">
+                {% for convo in conversations %}
+                    {% if not convo.is_spam %}
+                    <a href="{{ url_for('messages.chat', receiver_id=convo.id) }}" class="list-group-item list-group-item-action" data-conversation-id="{{ convo.id }}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <img src="{% if convo.profile_pic %}{{ url_for('static', filename=convo.profile_pic) }}{% else %}{{ url_for('static', filename='default_profile_pic.png') }}{% endif %}" 
+                                     alt="Profile Picture" 
+                                     class="rounded-circle me-3" 
+                                     style="width: 50px; height: 50px; object-fit: cover;">
+                                <div>
+                                    <h6 class="mb-1">{{ convo.username }}</h6>
+                                    <p class="mb-1 text-muted message-preview">
+                                        {{ convo.last_message }}
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <div class="text-muted small me-3">
+                                    {{ convo.last_message_time.strftime('%b %d, %Y %I:%M %p') }}
+                                </div>
+                                <div class="unseen-badge d-none">
+                                    <span class="badge bg-primary rounded-circle">•</span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <!-- Right side: Timestamp and unseen indicator -->
-                    <div class="d-flex align-items-center">
-                        <div class="text-muted small me-3">
-                            {{ convo.last_message_time.strftime('%b %d, %Y %I:%M %p') }}
-                        </div>
-                        <div class="unseen-badge d-none">
-                            <span class="badge bg-primary rounded-circle">•</span>
-                        </div>
-                    </div>
+                    </a>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Spam messages tab -->
+        <div class="tab-pane fade" id="spam" role="tabpanel">
+            <div class="alert alert-warning alert-dismissible fade show">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                Messages marked as spam are automatically filtered.
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            
+            <!-- Loading State -->
+            <div id="spam-loading" class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
                 </div>
-            </a>
-        {% endfor %}
+            </div>
+            
+            <!-- Messages Container -->
+            <div id="spam-messages" class="list-group"></div>
+        </div>
     </div>
 </div>
 
+<script src="{{ url_for('static', filename='js/spam_handling.js') }}"></script>
 <script>
+
+    // Function to update spam count
+    async function updateSpamCount() {
+        try {
+            const userId = document.body.dataset.userId;
+            if (!userId) return;
+            
+            const response = await fetch(`/api/spam/messages/${userId}`);
+            if (!response.ok) throw new Error('Failed to fetch spam count');
+            
+            const data = await response.json();
+            document.getElementById('spam-count').textContent = data.count || 0;
+        } catch (error) {
+            console.error('Error updating spam count:', error);
+        }
+    }
+
+    // WebSocket listener for new spam
+    function setupSpamListeners() {
+        socketio.on('new_spam', function(data) {
+            const spamCount = document.getElementById('spam-count');
+            spamCount.textContent = data.count || 0;
+            spamCount.classList.add('spam-count-updated');
+            setTimeout(() => {
+                spamCount.classList.remove('spam-count-updated');
+            }, 1000);
+        });
+    }
+
+    // Initialize when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        updateSpamCount();
+        setupSpamListeners();
+        
+        // Load spam messages when tab is clicked
+        document.getElementById('spam-tab').addEventListener('shown.bs.tab', loadSpamMessages);
+    });
+
+    
     // Function to check message status for each conversation
     async function checkMessageStatus() {
-        const conversations = document.querySelectorAll('.list-group-item');
+        const conversations = document.querySelectorAll('#regular-messages .list-group-item');
         for (const convo of conversations) {
             const senderId = convo.dataset.conversationId;
             try {
@@ -68,6 +144,9 @@
 
     // Check message status periodically
     setInterval(checkMessageStatus, 5000);
+    
+    // Load spam messages when spam tab is shown
+    document.getElementById('spam-tab').addEventListener('shown.bs.tab', loadSpamMessages);
 </script>
 
 <style>
@@ -97,6 +176,96 @@
         height: 8px;
         padding: 0;
         background-color: #0d6efd;
+    }
+    .spam-message {
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-left: 3px solid #dc3545;
+    }
+    .spam-message:hover {
+        background-color: #fff0f0;
+        transform: translateX(2px);
+    }
+    .message-preview {
+        max-width: 300px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    #spam-count {
+        font-size: 0.7em;
+        vertical-align: middle;
+    }
+
+/* Spam Message Styles */
+.spam-message-container {
+    position: relative;
+    cursor: default;
+    transition: all 0.2s ease;
+    border-left: 3px solid #dc3545;
+}
+
+.spam-message-container:hover {
+    background-color: #fff0f0;
+    z-index: 100;
+}
+
+.spam-details-window {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 0 0 5px 5px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    padding: 15px;
+    z-index: 1000;
+}
+
+.spam-message-container:hover .spam-details-window {
+    display: block;
+}
+
+.mark-not-spam {
+    transition: all 0.2s ease;
+}
+
+.mark-not-spam:hover {
+    transform: scale(1.02);
+}
+
+/* Toast Styles */
+#toast-container {
+    z-index: 1100;
+}
+
+.toast {
+    margin-bottom: 0.5rem;
+}
+    .mark-not-spam {
+        transition: all 0.2s ease;
+        z-index: 1; /* Ensure button stays above the link */
+    }
+    
+    .mark-not-spam:hover {
+        background-color: #198754;
+        color: white !important;
+        transform: scale(1.05);
+    }
+    
+    /* Loading spinner for the "Not Spam" button */
+    .btn-loading .spinner-border {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        vertical-align: text-bottom;
+        border-width: 0.15em;
+    }
+    /* Prevent the button text from being underlined like the link */
+    .spam-message .mark-not-spam {
+        text-decoration: none !important;
     }
 </style>
 {% endblock %}

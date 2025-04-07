@@ -1,0 +1,4 @@
+ALTER TABLE messages
+ADD COLUMN is_spam BOOLEAN DEFAULT FALSE,
+ADD COLUMN spam_confidence FLOAT,
+ADD COLUMN spam_features TEXT; 

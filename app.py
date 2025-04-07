@@ -5,15 +5,22 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from routes.messages import messages_bp, socketio
 import os
 from werkzeug.utils import secure_filename
+from routes.spam_detection import init_spam_detection, spam_bp
 
+# Correct initialization order
 app = Flask(__name__)
 app.secret_key = "8349fh79d98d39je"
 
-# Initialize WebSockets with Flask app
+# Initialize spam detection FIRST
+init_spam_detection(app)
+
+# Then initialize SocketIO
 socketio.init_app(app)
 
 # Register blueprints
-app.register_blueprint(auth)  # Ensure this is defined in auth.py
+# app.register_blueprint(spam_bp, url_prefix='/spam')
+app.register_blueprint(spam_bp)
+app.register_blueprint(auth)
 app.register_blueprint(messages_bp)
 
 # Configure upload folder and allowed extensions

@@ -42,20 +42,20 @@ def login():
         password = request.form["password"]
 
         db = get_db()
-        cur = db.cursor()
-        cur.execute("SELECT * FROM users WHERE email = %s", (email,))
-        user = cur.fetchone()
-        cur.close()
-        db.close()
+        with db.cursor() as cur:
+            cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+            user = cur.fetchone()
+            cur.close()
+            db.close()
 
-        if user and check_password_hash(user["password"], password):
-            session["user_id"] = user["id"]
-            session["username"] = user["username"]
-            session["email"] = user["email"]
-            flash("Login successful!", "success")
-            return redirect(url_for("profile"))
-        else:
-            flash("Invalid email or password.", "danger")
+            if user and check_password_hash(user["password"], password):
+                session["user_id"] = user["id"]
+                session["username"] = user["username"]
+                session["email"] = user["email"]
+                flash("Login successful!", "success")
+                return redirect(url_for("profile"))
+            else:
+                flash("Invalid email or password.", "danger")
 
     return render_template("login.html")
 

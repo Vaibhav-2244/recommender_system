@@ -1,6 +1,7 @@
 import pymysql
 from pymysql.cursors import DictCursor
 
+
 def get_db():
     return pymysql.connect(
         host="localhost",
