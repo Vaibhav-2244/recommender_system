@@ -51,34 +51,86 @@ def profile():
     db = get_db()
     cur = db.cursor()
 
-    # Fetch user profile details, including profile_pic
-    cur.execute("SELECT username, bio, interests, profile_pic FROM users JOIN profiles ON users.id = profiles.user_id WHERE users.id = %s", (user_id,))
+    # Fetch user profile details with all fields
+    cur.execute("""
+        SELECT users.username, profiles.* 
+        FROM users 
+        JOIN profiles ON users.id = profiles.user_id 
+        WHERE users.id = %s
+    """, (user_id,))
     profile = cur.fetchone()
 
+    # Create profile if doesn't exist
     if not profile:
-        cur.execute("INSERT INTO profiles (user_id, bio, interests, profile_pic) VALUES (%s, '', '', NULL)", (user_id,))
+        cur.execute("""
+            INSERT INTO profiles (
+                user_id, bio, interests, education, experience, skills,
+                current_position, organization, research_interests, publications,
+                linkedin_url, github_url, website_url, profile_pic
+            ) VALUES (%s, '', '', '', '', '', '', '', '', '', '', '', '', NULL)
+        """, (user_id,))
         db.commit()
+        # Refetch the newly created profile
+        cur.execute("SELECT users.username, profiles.* FROM users JOIN profiles ON users.id = profiles.user_id WHERE users.id = %s", (user_id,))
+        profile = cur.fetchone()
 
-    # Handle profile update (including profile picture upload)
+    # Handle profile update
     if request.method == "POST":
+        # Get all form data
         bio = request.form.get("bio", "")
         interests = request.form.get("interests", "")
+        education = request.form.get("education", "")
+        experience = request.form.get("experience", "")
+        skills = request.form.get("skills", "")
+        current_position = request.form.get("current_position", "")
+        organization = request.form.get("organization", "")
+        research_interests = request.form.get("research_interests", "")
+        publications = request.form.get("publications", "")
+        linkedin_url = request.form.get("linkedin_url", "")
+        github_url = request.form.get("github_url", "")
+        website_url = request.form.get("website_url", "")
 
         # Handle profile picture upload
+        profile_pic_path = None
         if 'profile_pic' in request.files:
             file = request.files['profile_pic']
             if file.filename != '' and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(filepath)
+                profile_pic_path = os.path.join('uploads', filename).replace("\\", "/")
 
-                # Store only the relative path in the database
-                relative_path = os.path.join('uploads', filename).replace("\\", "/")
-                cur.execute("UPDATE profiles SET profile_pic = %s WHERE user_id = %s", (relative_path, user_id))
-                db.commit()
+        # Update all profile fields
+        update_query = """
+            UPDATE profiles SET 
+                bio = %s, 
+                interests = %s,
+                education = %s,
+                experience = %s,
+                skills = %s,
+                current_position = %s,
+                organization = %s,
+                research_interests = %s,
+                publications = %s,
+                linkedin_url = %s,
+                github_url = %s,
+                website_url = %s
+        """
+        params = [
+            bio, interests, education, experience, skills,
+            current_position, organization, research_interests, publications,
+            linkedin_url, github_url, website_url
+        ]
 
-        # Update bio and interests
-        cur.execute("UPDATE profiles SET bio = %s, interests = %s WHERE user_id = %s", (bio, interests, user_id))
+        # Add profile pic to update if it was uploaded
+        if profile_pic_path:
+            update_query += ", profile_pic = %s"
+            params.append(profile_pic_path)
+
+        update_query += " WHERE user_id = %s"
+        params.append(user_id)
+
+        cur.execute(update_query, tuple(params))
         db.commit()
         flash("Profile updated successfully!", "success")
         return redirect(url_for("profile"))
@@ -106,7 +158,11 @@ def profile():
     cur.close()
     db.close()
 
-    return render_template("profile.html", profile=profile, friend_requests=friend_requests, connections=connections, is_own_profile=True)
+    return render_template("profile.html", 
+                         profile=profile, 
+                         friend_requests=friend_requests, 
+                         connections=connections, 
+                         is_own_profile=True)
 
 
 # Recommendations
@@ -156,28 +212,70 @@ def view_profile(user_id):
 
     current_user_id = session["user_id"]
     db = get_db()
-    cur = db.cursor()
+    cur = db.cursor()  # Using dictionary=True for easier access
 
-    # Fetch the requested user's profile, including profile_pic
-    cur.execute("SELECT users.id, users.username, profiles.bio, profiles.interests, profiles.profile_pic FROM users JOIN profiles ON users.id = profiles.user_id WHERE users.id = %s", (user_id,))
+    # Fetch the requested user's profile with ALL fields
+    cur.execute("""
+        SELECT 
+            users.id,
+            users.username, 
+            profiles.bio,
+            profiles.interests,
+            profiles.profile_pic,
+            profiles.education,
+            profiles.experience,
+            profiles.skills,
+            profiles.current_position,
+            profiles.organization,
+            profiles.research_interests,
+            profiles.publications,
+            profiles.linkedin_url,
+            profiles.github_url,
+            profiles.website_url
+        FROM users 
+        JOIN profiles ON users.id = profiles.user_id 
+        WHERE users.id = %s
+    """, (user_id,))
     profile = cur.fetchone()
 
     if not profile:
         flash("Profile not found.", "danger")
         return redirect(url_for("profile"))
 
-    # Check connection status
-    cur.execute("SELECT status FROM connections WHERE (sender_id = %s AND receiver_id = %s) OR (sender_id = %s AND receiver_id = %s)", (current_user_id, user_id, user_id, current_user_id))
+    # Check connection status between current user and viewed user
+    cur.execute("""
+        SELECT status 
+        FROM connections 
+        WHERE (sender_id = %s AND receiver_id = %s) 
+           OR (sender_id = %s AND receiver_id = %s)
+    """, (current_user_id, user_id, user_id, current_user_id))
     connection = cur.fetchone()
     
     connection_status = None
     if connection:
         connection_status = connection["status"]
 
+    # Fetch the viewed user's connections count and list
+    cur.execute("""
+        SELECT users.id, users.username 
+        FROM connections 
+        JOIN users ON users.id = CASE 
+            WHEN connections.sender_id = %s THEN connections.receiver_id
+            ELSE connections.sender_id 
+        END
+        WHERE (connections.sender_id = %s OR connections.receiver_id = %s) 
+        AND connections.status = 'accepted'
+    """, (user_id, user_id, user_id))
+    connections = cur.fetchall()
+
     cur.close()
     db.close()
 
-    return render_template("profile.html", profile=profile, is_own_profile=False, connection_status=connection_status)
+    return render_template("profile.html", 
+                         profile=profile, 
+                         is_own_profile=False, 
+                         connection_status=connection_status,
+                         connections=connections)  # Pass connections to template
 
 
 # send request 

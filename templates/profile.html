@@ -2,144 +2,389 @@
 
 {% block content %}
 <div class="container mt-4">
-    {% if is_own_profile %}
-        <h2 class="text-center">My Profile</h2>
-    {% else %}
-        <h2 class="text-center">{{ profile.username }}'s Profile</h2>
-    {% endif %}
+    <div class="profile-card">
+        {% if is_own_profile %}
+            <h2 class="profile-title gradient-text">My Profile</h2>
+        {% else %}
+            <h2 class="profile-title gradient-text">{{ profile.username }}'s Profile</h2>
+        {% endif %}
 
-    <div class="card">
-        <div class="card-body">
-            {% if is_own_profile %}
-                <!-- Combined Form for Profile Picture, Bio, and Interests -->
-                <form method="POST" enctype="multipart/form-data">
+        <div class="card glass-card">
+            <div class="card-body">
+                {% if is_own_profile %}
+                    <!-- Combined Form for Profile Picture and All Fields -->
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="row">
+                            <!-- Left Column - Profile Picture and Basic Info -->
+                            <div class="col-md-4">
+                                <div class="profile-pic-section text-center position-relative mb-4">
+                                    <label for="profile_pic_upload" class="profile-pic-label">
+                                        <div class="profile-pic-container">
+                                            {% if profile.profile_pic %}
+                                                <img id="profile_pic_preview" src="{{ url_for('static', filename=profile.profile_pic) }}" alt="Profile Picture" class="profile-pic-img">
+                                                <div class="delete-icon" onclick="removeProfilePicture()">
+                                                    <i class="fas fa-trash"></i>
+                                                </div>
+                                            {% else %}
+                                                <img id="profile_pic_preview" src="{{ url_for('static', filename='default_profile_pic.png') }}" alt="Default Profile Picture" class="profile-pic-img">
+                                                <div id="profile_pic_overlay" class="profile-pic-overlay">
+                                                    <i class="fas fa-camera"></i>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="upload-hint mt-2">Click to upload</div>
+                                    </label>
+                                    <input type="file" id="profile_pic_upload" name="profile_pic" class="d-none">
+                                </div>
+
+                                <!-- Quick Info Section -->
+                                <div class="quick-info-section">
+                                    <div class="mb-3">
+                                        <label for="current_position" class="form-label">Current Position</label>
+                                        <input type="text" class="form-control glass-input" id="current_position" name="current_position" value="{{ profile.current_position or '' }}">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="organization" class="form-label">Organization</label>
+                                        <input type="text" class="form-control glass-input" id="organization" name="organization" value="{{ profile.organization or '' }}">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right Column - Detailed Info -->
+                            <div class="col-md-8">
+                                <div class="profile-sections">
+                                    <!-- About Section -->
+                                    <div class="profile-section">
+                                        <h5 class="section-title"><i class="fas fa-user-circle me-2"></i>About</h5>
+                                        <div class="mb-3">
+                                            <label for="bio" class="form-label">Bio</label>
+                                            <textarea class="form-control glass-input" id="bio" name="bio" rows="3">{{ profile.bio or '' }}</textarea>
+                                        </div>
+                                    </div>
+
+                                    <!-- Professional Section -->
+                                    <div class="profile-section">
+                                        <h5 class="section-title"><i class="fas fa-briefcase me-2"></i>Professional</h5>
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label for="education" class="form-label">Education</label>
+                                                <textarea class="form-control glass-input" id="education" name="education" rows="3">{{ profile.education or '' }}</textarea>
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label for="experience" class="form-label">Experience</label>
+                                                <textarea class="form-control glass-input" id="experience" name="experience" rows="3">{{ profile.experience or '' }}</textarea>
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="skills" class="form-label">Skills (comma separated)</label>
+                                            <textarea class="form-control glass-input" id="skills" name="skills" rows="2">{{ profile.skills or '' }}</textarea>
+                                        </div>
+                                    </div>
+
+                                    <!-- Interests Section -->
+                                    <div class="profile-section">
+                                        <h5 class="section-title"><i class="fas fa-heart me-2"></i>Interests</h5>
+                                        <div class="mb-3">
+                                            <label for="interests" class="form-label">Personal Interests</label>
+                                            <textarea class="form-control glass-input" id="interests" name="interests" rows="2">{{ profile.interests or '' }}</textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="research_interests" class="form-label">Research Interests</label>
+                                            <textarea class="form-control glass-input" id="research_interests" name="research_interests" rows="2">{{ profile.research_interests or '' }}</textarea>
+                                        </div>
+                                    </div>
+
+                                    <!-- Publications Section -->
+                                    <div class="profile-section">
+                                        <h5 class="section-title"><i class="fas fa-book me-2"></i>Publications</h5>
+                                        <div class="mb-3">
+                                            <label for="publications" class="form-label">Publications (one per line)</label>
+                                            <textarea class="form-control glass-input" id="publications" name="publications" rows="3">{{ profile.publications or '' }}</textarea>
+                                        </div>
+                                    </div>
+
+                                    <!-- Links Section -->
+                                    <div class="profile-section">
+                                        <h5 class="section-title"><i class="fas fa-link me-2"></i>Links</h5>
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label for="linkedin_url" class="form-label">LinkedIn URL</label>
+                                                <input type="url" class="form-control glass-input" id="linkedin_url" name="linkedin_url" value="{{ profile.linkedin_url or '' }}">
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label for="github_url" class="form-label">GitHub URL</label>
+                                                <input type="url" class="form-control glass-input" id="github_url" name="github_url" value="{{ profile.github_url or '' }}">
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="website_url" class="form-label">Personal Website</label>
+                                            <input type="url" class="form-control glass-input" id="website_url" name="website_url" value="{{ profile.website_url or '' }}">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-end mt-4">
+                                    <button type="submit" class="btn btn-primary btn-glow">Update Profile</button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Connection Management Section -->
+                    <div class="connection-management mt-5">
+                        <div class="row">
+                            <!-- Pending Requests -->
+                            <div class="col-md-6">
+                                <div class="glass-card p-3 h-100">
+                                    <h5 class="section-title"><i class="fas fa-user-clock me-2"></i>Pending Requests</h5>
+                                    <div class="requests-container">
+                                        {% for request in friend_requests %}
+                                            <div class="request-item">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="flex-grow-1">
+                                                        <a href="{{ url_for('view_profile', user_id=request.sender_id) }}" class="text-decoration-none">
+                                                            <div class="d-flex flex-column">
+                                                                <span class="request-username">{{ request.username }}</span>
+                                                                <span class="request-email">{{ request.email }}</span>
+                                                            </div>
+                                                        </a>
+                                                    </div>
+                                                    <div class="request-actions">
+                                                        <a href="{{ url_for('respond_request', request_id=request.id, action='accept') }}" class="btn btn-success btn-sm btn-icon"><i class="fas fa-check"></i></a>
+                                                        <a href="{{ url_for('respond_request', request_id=request.id, action='decline') }}" class="btn btn-danger btn-sm btn-icon"><i class="fas fa-times"></i></a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <p class="text-muted">No pending requests</p>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Connections -->
+                            <div class="col-md-6">
+                                <div class="glass-card p-3 h-100">
+                                    <h5 class="section-title">
+                                        <i class="fas fa-users me-2"></i>
+                                        <span id="toggle-connections" style="cursor: pointer;">
+                                            {{ connections|length }} Connections
+                                        </span>
+                                    </h5>
+                                    <div id="connections-list" class="connections-list">
+                                        {% for connection in connections %}
+                                            <div class="connection-item">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span class="connection-username">{{ connection.username }}</span>
+                                                    <a href="{{ url_for('view_profile', user_id=connection.id) }}" class="btn btn-primary btn-sm btn-icon"><i class="fas fa-eye"></i></a>
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <p class="text-muted">No connections yet</p>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                {% else %}
+                    <!-- View Mode for Other Users' Profiles -->
                     <div class="row">
-                        <!-- Profile Picture Section (Left Side) -->
-                        <div class="col-md-3 text-center position-relative">
-                            <label for="profile_pic_upload" style="cursor: pointer;">
-                                <div class="profile-pic-container">
-                                    {% if profile.profile_pic %}
-                                        <img id="profile_pic_preview" src="{{ url_for('static', filename=profile.profile_pic) }}" alt="Profile Picture" class="img-fluid rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
-                                        <!-- Delete Icon -->
-                                        <div class="delete-icon" onclick="removeProfilePicture()">
-                                            <i class="fas fa-trash"></i>
-                                        </div>
-                                    {% else %}
-                                        <img id="profile_pic_preview" src="{{ url_for('static', filename='default_profile_pic.png') }}" alt="Default Profile Picture" class="img-fluid rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
-                                        <!-- Overlay with Camera Icon -->
-                                        <div id="profile_pic_overlay" class="profile-pic-overlay">
-                                            <i class="fas fa-camera"></i>
-                                        </div>
+                        <!-- Left Column -->
+                        <div class="col-md-4">
+                            <!-- Profile Picture -->
+                            <div class="text-center mb-4">
+                                {% if profile.profile_pic %}
+                                    <img src="{{ url_for('static', filename=profile.profile_pic) }}" class="img-fluid rounded-circle" style="width: 200px; height: 200px; object-fit: cover;">
+                                {% else %}
+                                    <img src="{{ url_for('static', filename='default_profile_pic.png') }}" class="img-fluid rounded-circle" style="width: 200px; height: 200px; object-fit: cover;">
+                                {% endif %}
+                            </div>
+
+                            <!-- Basic Info -->
+                            {% if profile.current_position or profile.organization %}
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    {% if profile.current_position %}
+                                        <h6><i class="fas fa-briefcase me-2"></i>{{ profile.current_position }}</h6>
+                                    {% endif %}
+                                    {% if profile.organization %}
+                                        <h6><i class="fas fa-building me-2"></i>{{ profile.organization }}</h6>
                                     {% endif %}
                                 </div>
-                            </label>
-                            <!-- Hidden File Input for Profile Picture -->
-                            <input type="file" id="profile_pic_upload" name="profile_pic" style="display: none;">
-                        </div>
-
-                        <!-- Bio and Interests Section (Right Side) -->
-                        <div class="col-md-9">
-                            <div class="mb-3">
-                                <label for="bio" class="form-label">Bio</label>
-                                <textarea class="form-control" id="bio" name="bio" rows="3">{{ profile.bio }}</textarea>
                             </div>
-                            <div class="mb-3">
-                                <label for="interests" class="form-label">Interests</label>
-                                <textarea class="form-control" id="interests" name="interests" rows="3">{{ profile.interests }}</textarea>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Update Profile</button>
-                        </div>
-                    </div>
-                </form>
+                            {% endif %}
 
-                <!-- Section to Accept/Reject Connection Requests -->
-                <div class="mt-4">
-                    <h5>Pending Connection Requests</h5>
-                    <div style="max-height: 200px; overflow-y: auto;">
-                        {% for request in friend_requests %}
-                            <div class="d-flex justify-content-between align-items-center border p-2 mb-2">
-                                <!-- Clickable Username and Email Section -->
-                                <a href="{{ url_for('view_profile', user_id=request.sender_id) }}" class="text-decoration-none flex-grow-1 me-3">
-                                    <div class="d-flex flex-column">
-                                        <span class="fw-bold">{{ request.username }}</span>
-                                        <span class="text-muted">{{ request.email }}</span>
-                                    </div>
-                                </a>
+                            <!-- Connection and Message Buttons -->
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    {% if connection_status == 'pending' %}
+                                        <button class="btn btn-secondary w-100 mb-2" disabled>Request Pending</button>
+                                    {% elif connection_status == 'accepted' %}
+                                        <form method="POST" action="{{ url_for('disconnect', user_id=profile.id) }}">
+                                            <button type="submit" class="btn btn-danger w-100 mb-2">Disconnect</button>
+                                        </form>
+                                    {% else %}
+                                        <form method="POST" action="{{ url_for('send_request', receiver_id=profile.id) }}">
+                                            <button type="submit" class="btn btn-primary w-100 mb-2">Connect</button>
+                                        </form>
+                                    {% endif %}
 
-                                <!-- Accept/Decline Buttons -->
-                                <div class="d-flex gap-2">
-                                    <a href="{{ url_for('respond_request', request_id=request.id, action='accept') }}" class="btn btn-success btn-sm">Accept</a>
-                                    <a href="{{ url_for('respond_request', request_id=request.id, action='decline') }}" class="btn btn-danger btn-sm">Decline</a>
+                                    <form action="{{ url_for('messages.chat', receiver_id=profile.id) }}" method="GET">
+                                        <button type="submit" class="btn btn-outline-primary w-100">
+                                            <i class="fas fa-envelope me-2"></i>Send Message
+                                        </button>
+                                    </form>
                                 </div>
                             </div>
-                        {% else %}
-                            <p class="text-muted">No pending requests.</p>
-                        {% endfor %}
-                    </div>
-                </div>
 
-                <!-- Connections Section -->
-                <div class="mt-4">
-                    <h5>
-                        <span id="toggle-connections" style="cursor: pointer; color: blue;">
-                            {{ connections|length }} Connections
-                        </span>
-                    </h5>
-                    <div id="connections-list" class="mt-2" style="display: none;">
-                        {% for connection in connections %}
-                            <div class="d-flex justify-content-between align-items-center border p-2 mb-2">
-                                <span>{{ connection.username }}</span>
-                                <a href="{{ url_for('view_profile', user_id=connection.id) }}" class="btn btn-primary btn-sm">View Profile</a>
+                            <!-- Connections Count -->
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title text-center">
+                                        <i class="fas fa-users me-2"></i>
+                                        <span id="toggle-connections" style="cursor: pointer;">
+                                            {{ connections|length }} Connections
+                                        </span>
+                                    </h5>
+                                    <div id="connections-list" class="mt-2" style="display: none;">
+                                        {% for connection in connections %}
+                                            <div class="d-flex justify-content-between align-items-center border p-2 mb-2">
+                                                <span>{{ connection.username }}</span>
+                                                <a href="{{ url_for('view_profile', user_id=connection.id) }}" class="btn btn-primary btn-sm">View Profile</a>
+                                            </div>
+                                        {% else %}
+                                            <p class="text-muted text-center">No connections yet</p>
+                                        {% endfor %}
+                                    </div>
+                                </div>
                             </div>
-                        {% else %}
-                            <p class="text-muted">No connections yet.</p>
-                        {% endfor %}
+
+                            <!-- Links -->
+                            {% if profile.linkedin_url or profile.github_url or profile.website_url %}
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">Links</h5>
+                                    <div class="d-flex flex-column gap-2">
+                                        {% if profile.linkedin_url %}
+                                            <a href="{{ profile.linkedin_url }}" target="_blank" class="btn btn-primary btn-sm">
+                                                <i class="fab fa-linkedin me-1"></i> LinkedIn
+                                            </a>
+                                        {% endif %}
+                                        {% if profile.github_url %}
+                                            <a href="{{ profile.github_url }}" target="_blank" class="btn btn-dark btn-sm">
+                                                <i class="fab fa-github me-1"></i> GitHub
+                                            </a>
+                                        {% endif %}
+                                        {% if profile.website_url %}
+                                            <a href="{{ profile.website_url }}" target="_blank" class="btn btn-info btn-sm">
+                                                <i class="fas fa-globe me-1"></i> Website
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Right Column -->
+                        <div class="col-md-8">
+                            <!-- About Section -->
+                            {% if profile.bio %}
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">About</h5>
+                                    <p class="card-text">{{ profile.bio }}</p>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            <!-- Professional Section -->
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">Professional Information</h5>
+                                    
+                                    {% if profile.education %}
+                                    <div class="mb-3">
+                                        <h6>Education</h6>
+                                        <p class="card-text">{{ profile.education }}</p>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if profile.experience %}
+                                    <div class="mb-3">
+                                        <h6>Experience</h6>
+                                        <p class="card-text">{{ profile.experience }}</p>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if profile.skills %}
+                                    <div class="mb-3">
+                                        <h6>Skills</h6>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            {% for skill in profile.skills.split(',') %}
+                                                <span class="badge bg-primary">{{ skill.strip() }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Interests Section -->
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">Interests</h5>
+                                    
+                                    {% if profile.interests %}
+                                    <div class="mb-3">
+                                        <h6>Personal Interests</h6>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            {% for interest in profile.interests.split(',') %}
+                                                <span class="badge bg-success">{{ interest.strip() }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if profile.research_interests %}
+                                    <div class="mb-3">
+                                        <h6>Research Interests</h6>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            {% for research in profile.research_interests.split(',') %}
+                                                <span class="badge bg-warning text-dark">{{ research.strip() }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Publications Section -->
+                            {% if profile.publications %}
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">Publications</h5>
+                                    <div class="list-group">
+                                        {% for pub in profile.publications.split('\n') %}
+                                            <div class="list-group-item">{{ pub }}</div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
                     </div>
-                </div>
-            {% else %}
-                <div class="row">
-                    <!-- Profile Picture Section (Left Side) -->
-                    <div class="col-md-3 text-center">
-                        {% if profile.profile_pic %}
-                            <img src="{{ url_for('static', filename=profile.profile_pic) }}" alt="Profile Picture" class="img-fluid rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
-                        {% else %}
-                            <img src="{{ url_for('static', filename='default_profile_pic.png') }}" alt="Default Profile Picture" class="img-fluid rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
-                        {% endif %}
-                    </div>
-
-                    <!-- Bio and Interests Section (Right Side) -->
-                    <div class="col-md-9">
-                        <h5 class="card-title">Bio</h5>
-                        <p class="card-text">{{ profile.bio }}</p>
-
-                        <h5 class="card-title">Interests</h5>
-                        <p class="card-text">{{ profile.interests }}</p>
-
-                        <!-- Connect Button (with pending and disconnect state) -->
-                        {% if connection_status == 'pending' %}
-                            <button class="btn btn-secondary" disabled>Pending</button>
-                        {% elif connection_status == 'accepted' %}
-                            <form method="POST" action="{{ url_for('disconnect', user_id=profile.id) }}">
-                                <button type="submit" class="btn btn-danger">Disconnect</button>
-                            </form>
-                        {% else %}
-                            <form method="POST" action="{{ url_for('send_request', receiver_id=profile.id) }}">
-                                <button type="submit" class="btn btn-primary">Connect</button>
-                            </form>
-                        {% endif %}
-
-                        <!-- Messaging option always available -->
-                        <form action="{{ url_for('messages.chat', receiver_id=profile.id) }}" method="GET">
-                            <button type="submit" class="btn btn-primary mt-3">Send Message</button>
-                        </form>
-                    </div>
-                </div>
-            {% endif %}
-        </div>
+                {% endif %} 
+            </div>
+        </div>               
     </div>
 </div>
 
+<!-- JavaScript -->
 <script>
+    // Toggle connections list
     document.getElementById("toggle-connections").addEventListener("click", function() {
         var connectionsList = document.getElementById("connections-list");
         if (connectionsList.style.display === "none") {
@@ -149,77 +394,98 @@
         }
     });
 
-    // Preview selected profile picture
+    // Profile picture upload preview
     document.getElementById("profile_pic_upload").addEventListener("change", function(event) {
-        const file = event.target.files[0]; // Get the selected file
+        const file = event.target.files[0];
         if (file) {
-            const reader = new FileReader(); // Create a FileReader to read the file
-
-            // Set up the FileReader onload event
+            const reader = new FileReader();
             reader.onload = function(e) {
-                // Update the src attribute of the profile picture preview
                 document.getElementById("profile_pic_preview").src = e.target.result;
+                const overlay = document.getElementById("profile_pic_overlay");
+                if (overlay) overlay.style.display = "none";
             };
-
-            // Read the file as a Data URL (base64 encoded)
             reader.readAsDataURL(file);
         }
     });
 
-    // Function to remove profile picture
+    // Remove profile picture
     function removeProfilePicture() {
         if (confirm("Are you sure you want to remove your profile picture?")) {
             fetch("/remove_profile_pic", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                headers: { "Content-Type": "application/json" },
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success) {
-                    // Reload the page to reflect changes
-                    window.location.reload();
-                } else {
-                    alert("Failed to remove profile picture.");
-                }
+                if (data.success) window.location.reload();
+                else alert("Failed to remove profile picture.");
             })
-            .catch(error => {
-                console.error("Error:", error);
-            });
+            .catch(error => console.error("Error:", error));
         }
     }
-    // Preview selected profile picture
-document.getElementById("profile_pic_upload").addEventListener("change", function(event) {
-    const file = event.target.files[0]; // Get the selected file
-    if (file) {
-        const reader = new FileReader(); // Create a FileReader to read the file
-
-        // Set up the FileReader onload event
-        reader.onload = function(e) {
-            // Update the src attribute of the profile picture preview
-            document.getElementById("profile_pic_preview").src = e.target.result;
-
-            // Hide the hover effect (camera icon overlay)
-            document.getElementById("profile_pic_overlay").style.display = "none";
-        };
-
-        // Read the file as a Data URL (base64 encoded)
-        reader.readAsDataURL(file);
-    }
-});
 </script>
 
-<!-- Add Font Awesome for Icons -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-
-<!-- Add Custom CSS -->
+<!-- Custom CSS -->
 <style>
+    /* Base Styles */
+    .profile-card {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    .glass-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+        overflow: hidden;
+    }
+    
+    .profile-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+    
+    .gradient-text {
+        background: linear-gradient(45deg, #4f46e5, #06b6d4);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+    }
+    
+    /* Profile Picture Styles */
+    .profile-pic-section {
+        position: relative;
+    }
+    
+    .profile-pic-label {
+        cursor: pointer;
+        display: block;
+    }
+    
     .profile-pic-container {
         position: relative;
         display: inline-block;
     }
-
+    
+    .profile-pic-img {
+        width: 200px;
+        height: 200px;
+        object-fit: cover;
+        border-radius: 50%;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .profile-pic-label:hover .profile-pic-img {
+        transform: scale(1.05);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+    
     .profile-pic-overlay {
         position: absolute;
         top: 0;
@@ -234,38 +500,316 @@ document.getElementById("profile_pic_upload").addEventListener("change", functio
         opacity: 0;
         transition: opacity 0.3s ease;
     }
-
-    .profile-pic-overlay i {
-        color: white;
-        font-size: 24px;
-    }
-
-    .profile-pic-container:hover .profile-pic-overlay {
+    
+    .profile-pic-label:hover .profile-pic-overlay {
         opacity: 1;
     }
-
+    
+    .profile-pic-overlay i {
+        color: white;
+        font-size: 2rem;
+    }
+    
+    .upload-hint {
+        color: #6c757d;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+    }
+    
+    .profile-pic-label:hover .upload-hint {
+        color: #4f46e5;
+    }
+    
     .delete-icon {
         position: absolute;
-        top: 0;
-        right: 0;
-        background: rgba(255, 0, 0, 0.7);
+        top: 10px;
+        right: 10px;
+        background: rgba(239, 68, 68, 0.8);
         border-radius: 50%;
-        width: 30px;
-        height: 30px;
+        width: 36px;
+        height: 36px;
         display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        transition: background 0.3s ease;
+        transition: all 0.3s ease;
+        z-index: 10;
     }
-
+    
     .delete-icon:hover {
-        background: rgba(255, 0, 0, 1);
+        background: rgba(220, 38, 38, 1);
+        transform: scale(1.1);
     }
-
+    
     .delete-icon i {
         color: white;
-        font-size: 14px;
+        font-size: 16px;
     }
+    
+    /* Form Styles */
+    .glass-input {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #333;
+        transition: all 0.3s ease;
+    }
+    
+    .glass-input:focus {
+        background: rgba(255, 255, 255, 0.2);
+        border-color: rgba(79, 70, 229, 0.4);
+        box-shadow: 0 0 0 0.25rem rgba(79, 70, 229, 0.25);
+    }
+    
+    /* Section Styles */
+    .profile-section {
+        margin-bottom: 2rem;
+        padding: 1.5rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        transition: all 0.3s ease;
+    }
+    
+    .profile-section:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateY(-2px);
+    }
+    
+    .section-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #4f46e5;
+        margin-bottom: 1.25rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .subsection-title {
+        font-size: 1rem;
+        font-weight: 500;
+        color: #6b7280;
+        margin-bottom: 0.75rem;
+    }
+    
+    /* Badge Styles */
+    .skill-badge {
+        display: inline-block;
+        background: rgba(79, 70, 229, 0.1);
+        color: #4f46e5;
+        padding: 0.35rem 0.75rem;
+        border-radius: 50px;
+        margin: 0.25rem;
+        font-size: 0.85rem;
+    }
+    
+    .interest-badge {
+        display: inline-block;
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+        padding: 0.35rem 0.75rem;
+        border-radius: 50px;
+        margin: 0.25rem;
+        font-size: 0.85rem;
+    }
+    
+    .research-badge {
+        display: inline-block;
+        background: rgba(236, 72, 153, 0.1);
+        color: #ec4899;
+        padding: 0.35rem 0.75rem;
+        border-radius: 50px;
+        margin: 0.25rem;
+        font-size: 0.85rem;
+    }
+    
+    /* Button Styles */
+    .btn-glow {
+        position: relative;
+        overflow: hidden;
+        z-index: 1;
+    }
+    
+    .btn-glow::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: 0.5s;
+        z-index: -1;
+    }
+    
+    .btn-glow:hover::before {
+        left: 100%;
+    }
+    
+    .btn-icon {
+        width: 36px;
+        height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border-radius: 50%;
+    }
+    
+    .btn-linkedin {
+        background-color: #0077b5;
+        color: white;
+    }
+    
+    /* Connection Management */
+    .connection-management {
+        margin-top: 2rem;
+    }
+    
+    .request-item, .connection-item {
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+    
+    .request-item:hover, .connection-item:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateX(5px);
+    }
+    
+    .request-username {
+        font-weight: 500;
+        color: #111827;
+    }
+    
+    .request-email {
+        font-size: 0.85rem;
+        color: #6b7280;
+    }
+    
+    .requests-container, .connections-list {
+        max-height: 300px;
+        overflow-y: auto;
+        padding-right: 0.5rem;
+    }
+    
+    /* View Mode Specific Styles */
+    .profile-text {
+        color: #374151;
+        line-height: 1.7;
+    }
+    
+    .info-item {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+    }
+    
+    .info-item i {
+        color: #4f46e5;
+        width: 24px;
+        text-align: center;
+    }
+    
+    .publication-item {
+        display: flex;
+        align-items: flex-start;
+        padding: 0.5rem 0;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+    }
+    
+    .publication-item i {
+        color: #4f46e5;
+        margin-top: 0.25rem;
+    }
+    
+    .action-buttons .btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .btn-outline-primary {
+        background: transparent;
+        border: 1px solid #4f46e5;
+        color: #4f46e5;
+    }
+    
+    .btn-outline-primary:hover {
+        background: #4f46e5;
+        color: white;
+    }
+    
+    /* Make sure message button text is always visible */
+    .btn-outline-primary {
+        opacity: 1 !important;
+    }
+    
+    /* Card styling for better visibility */
+    .card {
+        border: 1px solid rgba(0,0,0,0.1);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .card-body {
+        padding: 1.5rem;
+    }
+    
+    .card-title {
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 1rem;
+    }
+    
+    /* Responsive Adjustments */
+    @media (max-width: 768px) {
+        .profile-title {
+            font-size: 2rem;
+        }
+        
+        .profile-pic-img {
+            width: 150px;
+            height: 150px;
+        }
+        
+        .col-md-4, .col-md-8 {
+            padding: 0 15px;
+        }
+    }
+        /* Make form fields clearly visible */
+        .form-control {
+            background-color: white;
+            border: 1px solid #ced4da;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+    
+        .form-control:focus {
+            border-color: #86b7fe;
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        }
+    
+        .form-label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: block;
+            color: #495057;
+        }
+    
+        /* Glass effect for the form sections */
+        .profile-section {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
 </style>
+
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 {% endblock %}
