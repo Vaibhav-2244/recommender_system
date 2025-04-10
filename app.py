@@ -6,6 +6,8 @@ from routes.messages import messages_bp, socketio
 import os
 from werkzeug.utils import secure_filename
 from routes.spam_detection import init_spam_detection, spam_bp
+from chatbot import get_response
+from api_integration import fetch_news, fetch_dev_jobs, fetch_github_trending
 
 # Correct initialization order
 app = Flask(__name__)
@@ -431,6 +433,28 @@ def search_users():
         })
 
     return jsonify(users_list)
+
+@app.route("/chatbot", methods=['GET'])
+def chatbot():
+    return render_template("chatbot.html")
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    user_input = request.json.get("message")
+    bot_response = get_response(user_input)
+    return jsonify({"response": bot_response})
+
+@app.route("/news")
+def news():
+    return jsonify(fetch_news())
+
+@app.route("/jobs")
+def jobs():
+    return jsonify(fetch_dev_jobs())
+
+@app.route("/github")
+def github():
+    return jsonify(fetch_github_trending())
 
 if __name__ == "__main__":
     socketio.run(app, debug=True)
