@@ -3,6 +3,7 @@ from auth import auth
 from database import get_db
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from routes.messages import messages_bp, socketio
+from routes.recommendations import recommendations_bp
 import os
 from werkzeug.utils import secure_filename
 from routes.spam_detection import init_spam_detection, spam_bp
@@ -24,6 +25,7 @@ socketio.init_app(app)
 app.register_blueprint(spam_bp)
 app.register_blueprint(auth)
 app.register_blueprint(messages_bp)
+app.register_blueprint(recommendations_bp)
 
 # Configure upload folder and allowed extensions
 app.config['UPLOAD_FOLDER'] = 'static/uploads'  # Folder to store uploaded images
@@ -166,44 +168,6 @@ def profile():
                          connections=connections, 
                          is_own_profile=True)
 
-
-# Recommendations
-@app.route("/recommendations")
-def recommendations():
-    if "user_id" not in session:
-        flash("Please log in first.", "warning")
-        return redirect(url_for("auth.login"))
-
-    user_id = session["user_id"]
-    db = get_db()
-    cur = db.cursor()
-
-
-    cur.execute("SELECT interests FROM profiles WHERE user_id = %s", (user_id,))
-    user_interests = cur.fetchone()
-
-    if not user_interests or not user_interests["interests"]:
-        flash("Update your interests to get recommendations.", "info")
-        return redirect(url_for("profile"))
-
-    user_interests = user_interests["interests"].replace(" ", "").split(",") 
-
-    # Create a REGEXP pattern to match interests properly
-    regex_pattern = "|".join(user_interests)
-
-    
-    cur.execute("""
-        SELECT users.id, users.username, users.email, profiles.bio, profiles.interests, profiles.profile_pic
-        FROM users 
-        JOIN profiles ON users.id = profiles.user_id 
-        WHERE users.id != %s AND REPLACE(profiles.interests, ' ', '') REGEXP %s
-    """, (user_id, regex_pattern))
-
-    recommendations = cur.fetchall()
-    cur.close()
-    db.close()
-
-    return render_template("recommendations.html", users=recommendations)
 
 # View Other Users' Profiles
 @app.route("/profile/<int:user_id>")

@@ -1,11 +1,16 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from database import get_db
 import MySQLdb
 from functools import wraps
+from google.oauth2 import id_token
+from google.auth.transport import requests
+import os
 
 auth = Blueprint("auth", __name__)
 
+# Google OAuth Config
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com')
 
 @auth.route("/signup", methods=["GET", "POST"])
 def signup():
@@ -105,3 +110,95 @@ def delete_account():
         db.close()
 
     return redirect(url_for("auth.signup"))
+
+@auth.route("/google-auth", methods=["POST"])
+def google_auth():
+    if request.method == "POST":
+        token = request.json.get('credential')
+        csrf_token = request.json.get('g_csrf_token')
+        
+        if not token:
+            return jsonify({'success': False, 'message': 'No credential token provided'}), 400
+        
+        try:
+            # Verify the Google ID token
+            idinfo = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
+            
+            # Check that the token is valid for our client
+            if idinfo['aud'] != GOOGLE_CLIENT_ID:
+                raise ValueError('Invalid client ID')
+            
+            # Get user info from Google
+            email = idinfo['email']
+            name = idinfo.get('name', 'User')
+            google_id = idinfo['sub']
+            
+            db = get_db()
+            cur = db.cursor()
+            
+            try:
+                # Check if user exists
+                cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+                user = cur.fetchone()
+                
+                if user:
+                    # User exists, log them in
+                    session["user_id"] = user["id"]
+                    session["username"] = user["username"]
+                    session["email"] = user["email"]
+                    return jsonify({
+                        'success': True,
+                        'redirect': url_for('profile')
+                    })
+                else:
+                    # Create new user
+                    username = email.split('@')[0]  # Use email prefix as username
+                    
+                    # Check if username exists, append numbers if needed
+                    counter = 1
+                    original_username = username
+                    while True:
+                        cur.execute("SELECT id FROM users WHERE username = %s", (username,))
+                        if not cur.fetchone():
+                            break
+                        username = f"{original_username}{counter}"
+                        counter += 1
+                    
+                    # Insert new user with NULL password (Google-authenticated users don't need one)
+                    cur.execute(
+                        "INSERT INTO users (username, email, google_id) VALUES (%s, %s, %s)",
+                        (username, email, google_id)
+                    )
+                    db.commit()
+                    
+                    # Get the new user's ID
+                    cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+                    user_id = cur.fetchone()["id"]
+                    
+                    # Set session
+                    session["user_id"] = user_id
+                    session["username"] = username
+                    session["email"] = email
+                    
+                    return jsonify({
+                        'success': True,
+                        'redirect': url_for('profile')
+                    })
+                    
+            except MySQLdb.Error as e:
+                db.rollback()
+                return jsonify({
+                    'success': False,
+                    'message': 'Database error during authentication'
+                }), 500
+                
+            finally:
+                cur.close()
+                db.close()
+                
+        except ValueError as e:
+            # Invalid token
+            return jsonify({
+                'success': False,
+                'message': 'Invalid authentication token'
+            }), 401
