@@ -377,5 +377,28 @@ def report_not_spam(message_id):
         db.rollback()
         logger.error(f"Error reporting not spam: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@messages_bp.route('/unread_count')
+def get_unread_count():
+    if 'user_id' not in session:
+        return jsonify({'count': 0})
+    
+    user_id = session['user_id']
+    db = get_db()
+    cursor = db.cursor()
+    
+    cursor.execute("""
+        SELECT COUNT(*) as count
+        FROM messages
+        WHERE receiver_id = %s AND is_seen = FALSE
+    """, (user_id,))
+    
+    result = cursor.fetchone()
+    count = result['count'] if result else 0
+    
+    cursor.close()
+    db.close()
+    
+    return jsonify({'count': count})
     
     

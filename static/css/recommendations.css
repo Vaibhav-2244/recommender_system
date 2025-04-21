@@ -1,0 +1,148 @@
+.recommendations-container {
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.recommendations-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.recommendations-header h1 {
+    font-size: 2.5rem;
+    font-weight: 600;
+    background: linear-gradient(45deg, #4f46e5, #06b6d4);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 1rem;
+}
+
+.recommendations-header p {
+    color: #64748b;
+    font-size: 1.1rem;
+}
+
+.recommendations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.recommendation-card {
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.recommendation-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.recommendation-card .profile-header {
+    position: relative;
+    height: 120px;
+    background: linear-gradient(45deg, #4f46e5, #06b6d4);
+}
+
+.recommendation-card .profile-pic {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 4px solid white;
+    position: absolute;
+    bottom: -50px;
+    left: 50%;
+    transform: translateX(-50%);
+    object-fit: cover;
+    background: white;
+}
+
+.recommendation-card .profile-content {
+    padding: 4rem 1.5rem 1.5rem;
+    text-align: center;
+}
+
+.recommendation-card .profile-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #1e293b;
+}
+
+.recommendation-card .profile-title {
+    color: #64748b;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.recommendation-card .profile-bio {
+    color: #475569;
+    font-size: 0.95rem;
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+}
+
+.recommendation-card .profile-interests {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+}
+
+.recommendation-card .interest-tag {
+    background: #f1f5f9;
+    color: #475569;
+    padding: 0.25rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.8rem;
+    transition: all 0.3s;
+}
+
+.recommendation-card .interest-tag:hover {
+    background: #e2e8f0;
+}
+
+.recommendation-card .connect-btn {
+    background: linear-gradient(45deg, #4f46e5, #06b6d4);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 50px;
+    font-weight: 500;
+    transition: all 0.3s;
+    width: 100%;
+}
+
+.recommendation-card .connect-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.recommendation-card .similarity-score {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 0.25rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.8rem;
+    color: #4f46e5;
+    font-weight: 500;
+}
+
+@media (max-width: 768px) {
+    .recommendations-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .recommendations-header h1 {
+        font-size: 2rem;
+    }
+} 

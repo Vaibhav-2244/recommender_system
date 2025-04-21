@@ -2,36 +2,382 @@
 {% block title %}Recommendations{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <h2 class="text-center mb-4">Recommended Users</h2>
-        {% if users %}
-            <div class="list-group">
-                {% for user in users %}
-                <div class="list-group-item">
-                    <div class="d-flex align-items-center">
-                        <!-- Profile Picture -->
-                        <div class="flex-shrink-0">
-                            <img src="{% if user.profile_pic %}{{ url_for('static', filename=user.profile_pic) }}{% else %}{{ url_for('static', filename='default_profile_pic.png') }}{% endif %}" alt="Profile Picture" class="rounded-circle" style="width: 60px; height: 60px; object-fit: cover;">
-                        </div>
+<div class="recommendations-container">
+    <!-- Animated background elements -->
+    <div class="particles"></div>
+    <div class="light-beam"></div>
+    
+    <div class="recommendations-header">
+        <h2 class="neon-text">User Recommendations</h2>
+        <div class="scan-line"></div>
+        <p class="subtitle">Users matching your digital footprint</p>
+    </div>
 
-                        <!-- User Details -->
-                        <div class="flex-grow-1 ms-3">
-                            <strong>{{ user.username }}</strong> ({{ user.email }})<br>
-                            <small class="text-muted">{{ user.bio }}</small>
-                        </div>
-
-                        <!-- View Profile Button -->
-                        <div class="flex-shrink-0">
-                            <a href="{{ url_for('view_profile', user_id=user.id) }}" class="btn btn-primary btn-sm">View Profile</a>
+    {% if users %}
+    <div class="user-grid">
+        {% for user in users %}
+        <div class="user-card">
+            <!-- Holographic profile image -->
+            <div class="profile-hologram">
+                <div class="hologram-effect"></div>
+                <img src="{% if user.profile_pic %}{{ url_for('static', filename=user.profile_pic) }}{% else %}{{ url_for('static', filename='default_profile_pic.png') }}{% endif %}" 
+                     alt="Profile Picture" class="profile-image">
+            </div>
+            
+            <!-- User info with futuristic UI elements -->
+            <div class="user-info">
+                <h3 class="username">{{ user.username }}</h3>
+                <div class="user-stats">
+                    <div class="stat">
+                        <span class="stat-label">Connection Score</span>
+                        <div class="stat-bar">
+                            <!-- <div class="stat-fill" style="width: {{ range(75, 96) | random }}%;"></div> -->
+                            <div class="stat-fill"></div>
                         </div>
                     </div>
                 </div>
-                {% endfor %}
+                
+                <div class="user-bio">
+                    <p>{{ user.bio or "This user prefers to maintain an air of mystery." }}</p>
+                </div>
+                
+                <div class="user-tags">
+                    <span class="tag">#compatible</span>
+                    <span class="tag">#similar_interests</span>
+                </div>
             </div>
-        {% else %}
-            <p class="text-center text-muted">No similar users found.</p>
-        {% endif %}
+            
+            <!-- Glowing action button -->
+            <a href="{{ url_for('view_profile', user_id=user.id) }}" class="view-profile-btn">
+                <span>View Profile</span>
+                <div class="btn-glow"></div>
+            </a>
+            
+            <!-- Card glow effects -->
+            <div class="card-glow"></div>
+        </div>
+        {% endfor %}
     </div>
+    {% else %}
+    <div class="no-results">
+        <div class="hologram-container">
+            <div class="empty-hologram"></div>
+        </div>
+        <h3 class="neon-text">No matches found</h3>
+        <p>Adjust your parameters or try again later</p>
+    </div>
+    {% endif %}
 </div>
+
+<style>
+:root {
+    --primary-color: #00f7ff;
+    --secondary-color: #ff00e6;
+    --dark-bg: #0a0a1a;
+    --card-bg: rgba(15, 15, 35, 0.7);
+    --text-color: #e0e0ff;
+}
+
+.recommendations-container {
+    position: relative;
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    color: var(--text-color);
+    overflow: hidden;
+    font-family: 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.particles {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at center, transparent 0%, var(--dark-bg) 70%);
+    z-index: -2;
+}
+
+.particles::before {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='20' cy='20' r='0.5' fill='%2300f7ff'/%3E%3Ccircle cx='80' cy='120' r='0.7' fill='%23ff00e6'/%3E%3Ccircle cx='150' cy='50' r='0.3' fill='%2300f7ff'/%3E%3Ccircle cx='180' cy='180' r='0.5' fill='%23ff00e6'/%3E%3C/svg%3E");
+    opacity: 0.3;
+    animation: float 30s infinite linear;
+}
+
+.light-beam {
+    position: absolute;
+    top: 0;
+    right: -100px;
+    width: 300px;
+    height: 100%;
+    background: linear-gradient(90deg, rgba(0, 247, 255, 0.05) 0%, rgba(0, 247, 255, 0.2) 50%, rgba(0, 247, 255, 0.05) 100%);
+    transform: skewX(-20deg);
+    z-index: -1;
+    animation: beam-sweep 15s infinite alternate;
+}
+
+.recommendations-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    position: relative;
+}
+
+.neon-text {
+    color: var(--primary-color);
+    text-shadow: 0 0 10px var(--primary-color), 0 0 20px var(--primary-color);
+    font-weight: 300;
+    letter-spacing: 1px;
+    margin-bottom: 1rem;
+}
+
+.scan-line {
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, var(--primary-color) 50%, transparent 100%);
+    margin: 1rem auto;
+    width: 60%;
+    animation: scan 3s infinite linear;
+}
+
+.subtitle {
+    color: rgba(224, 224, 255, 0.7);
+    font-size: 0.9rem;
+}
+
+.user-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 2rem;
+}
+
+.user-card {
+    background: var(--card-bg);
+    border-radius: 10px;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(0, 247, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.user-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 247, 255, 0.1);
+}
+
+.profile-hologram {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    margin: 0 auto 1.5rem;
+}
+
+.hologram-effect {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at center, transparent 30%, var(--primary-color) 100%);
+    opacity: 0.3;
+    border-radius: 50%;
+    animation: pulse 4s infinite alternate;
+}
+
+.profile-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 2px solid var(--primary-color);
+    position: relative;
+    z-index: 1;
+}
+
+.user-info {
+    margin-bottom: 1.5rem;
+}
+
+.username {
+    color: var(--primary-color);
+    text-align: center;
+    margin-bottom: 1rem;
+    font-weight: 400;
+}
+
+.user-stats {
+    margin: 1rem 0;
+}
+
+.stat {
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    display: block;
+    font-size: 0.8rem;
+    color: rgba(224, 224, 255, 0.7);
+    margin-bottom: 0.3rem;
+}
+
+.stat-bar {
+    height: 6px;
+    background: rgba(0, 247, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.stat-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    border-radius: 3px;
+    animation: expand 1s ease-out;
+}
+
+.user-bio {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: rgba(224, 224, 255, 0.8);
+    margin: 1rem 0;
+    padding: 0.5rem;
+    border-left: 2px solid var(--primary-color);
+    background: rgba(0, 247, 255, 0.05);
+}
+
+.user-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.tag {
+    font-size: 0.7rem;
+    padding: 0.3rem 0.6rem;
+    background: rgba(0, 247, 255, 0.1);
+    border-radius: 20px;
+    color: var(--primary-color);
+    border: 1px solid rgba(0, 247, 255, 0.3);
+}
+
+.view-profile-btn {
+    display: block;
+    text-align: center;
+    padding: 0.7rem 1.5rem;
+    background: rgba(0, 247, 255, 0.1);
+    color: var(--primary-color);
+    border: 1px solid var(--primary-color);
+    border-radius: 5px;
+    text-decoration: none;
+    font-size: 0.9rem;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    margin-top: 1rem;
+}
+
+.view-profile-btn:hover {
+    background: rgba(0, 247, 255, 0.2);
+    box-shadow: 0 0 10px rgba(0, 247, 255, 0.3);
+}
+
+.btn-glow {
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0, 247, 255, 0.3), transparent);
+    transition: all 0.5s ease;
+}
+
+.view-profile-btn:hover .btn-glow {
+    left: 100%;
+}
+
+.card-glow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at center, transparent 70%, var(--primary-color) 100%);
+    opacity: 0;
+    z-index: -1;
+    transition: opacity 0.3s ease;
+}
+
+.user-card:hover .card-glow {
+    opacity: 0.1;
+}
+
+.no-results {
+    text-align: center;
+    padding: 3rem;
+}
+
+.hologram-container {
+    width: 200px;
+    height: 200px;
+    margin: 0 auto 2rem;
+    position: relative;
+}
+
+.empty-hologram {
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 247, 255, 0.05);
+    border: 2px dashed rgba(0, 247, 255, 0.3);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: float 6s ease-in-out infinite;
+}
+
+.empty-hologram::before {
+    content: "?";
+    font-size: 3rem;
+    color: rgba(0, 247, 255, 0.3);
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+@keyframes pulse {
+    0% { opacity: 0.2; transform: scale(0.95); }
+    100% { opacity: 0.4; transform: scale(1.05); }
+}
+
+@keyframes beam-sweep {
+    0% { right: -100px; }
+    100% { right: 100%; }
+}
+
+@keyframes scan {
+    0% { opacity: 0.3; }
+    50% { opacity: 1; }
+    100% { opacity: 0.3; }
+}
+
+@keyframes expand {
+    0% { width: 0%; }
+    100% { width: attr(data-width); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .user-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .recommendations-header {
+        margin-bottom: 2rem;
+    }
+}
+</style>
 {% endblock %}
